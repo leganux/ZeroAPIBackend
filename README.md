@@ -139,6 +139,7 @@ curl -X GET "http://localhost:3000/api/orders/?populate[localFields]=userId&popu
 ```
 
 ### Combined Examples
+
 You can combine several query parameters to perform more complex queries.
 
 Example: Retrieve the first page of records from the users table, with 5 records per page, only the name and email
@@ -149,9 +150,12 @@ curl -X GET "http://localhost:3000/api/users/?select=name,email&paginate[limit]=
 ```
 
 ### Usage in Create Operations
-You can use select, populate, and other parameters in create operations to specify which fields to include in the response and how to relate the new documents.
+
+You can use select, populate, and other parameters in create operations to specify which fields to include in the
+response and how to relate the new documents.
 
 Example: Create a new record in the users table and return only the name and email fields:
+
 ```bash 
 curl -X POST "http://localhost:3000/api/users/?select=name,email" -H "Content-Type: application/json" -d '{
     "name": "Jane Doe",
@@ -160,3 +164,91 @@ curl -X POST "http://localhost:3000/api/users/?select=name,email" -H "Content-Ty
 }'
 
 ```
+
+## Detailed Explanation of How Populates Work in the Library
+
+The populateConstructor function is used to fetch related data from other tables and incorporate it into the main query
+result. This mimics the behavior of SQL joins in a NoSQL database by manually linking documents based on specified
+fields.
+
+## How populateConstructor Works
+
+1. Parameter Parsing:
+
+The populate object contains localFields, tables, and foreignFields, which are comma-separated strings specifying the
+fields and tables involved in the population.
+These strings are split into arrays for further processing.
+
+2. Iteration Over Records:
+
+For each item in the list_of_elements (the main query result), the function iterates over the specified fields and
+tables.
+For each field-table combination, a filter is constructed to match the related documents in the foreign table.
+
+3. Filter Construction:
+
+If the value of the localField in the current item is a string, a simple equality filter is created.
+If the value is an array, an $in filter is created to match any of the values in the array.
+
+4. Field Selection:
+
+If populateFields are specified, only the indicated fields are selected from the foreign table.
+
+5. Database Query:
+
+The function initializes the connection to the foreign table and executes the query with the constructed filter and
+field selection.
+The results are stored back into the original item, replacing the localField value with the related documents.
+
+6. Final Assembly:
+
+The populated items are collected into a new array and returned.
+Example of Using Populates in CLI
+To use the populate parameter in your CLI to fetch related data from other tables, follow this example:
+
+## Scenario
+
+You have two collections: orders and users. Each order document has a userId field referencing a user. You want to
+retrieve orders and include user details in the result.
+
+```bash 
+curl -X GET "http://localhost:3000/api/orders/?populate[localFields]=userId&populate[tables]=users&populate[foreignFields]=_id"
+```
+
+### How the Example Works
+
+1. Query URL:
+
+* The URL specifies the orders table and includes the populate parameter with localFields, tables, and foreignFields.
+* localFields=userId: Indicates the field in the orders collection that references the users collection.
+* tables=users: Specifies the foreign table (users) to fetch data from.
+* foreignFields=_id: Specifies the field in the users collection that matches the userId field in the orders collection.
+
+2. Result:
+
+* The server will process the request, fetch orders, and for each order, it will look up the corresponding user in the
+  users collection.
+* The userId in each order will be replaced with the full user document.
+
+## Extended Example with Field Selection
+
+You can also specify which fields to include from the related documents using populateFields.
+
+Example Command
+
+```bash 
+curl -X GET "http://localhost:3000/api/orders/?populate[localFields]=userId&populate[tables]=users&populate[foreignFields]=_id&populateFields[users]=name,email"
+```
+
+### How the Extended Example Works
+
+1. Query URL:
+
+* The URL includes an additional populateFields parameter specifying which fields to include from the users collection.
+  populateFields[users]=name,email: Indicates that only the name and email fields from the users collection should be
+  included in the response.
+
+2. Result:
+
+* The server will fetch orders and populate the userId field with user documents that include only the name and email
+  fields.
