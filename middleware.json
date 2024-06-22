@@ -1,0 +1,57 @@
+{
+    "defaultUser": { //defaul admin user
+        "email": "admin@mail.com",
+        "password": "12345"
+    },
+    "JWTPassword":"myPreciousToken001",
+    "register": { // allows auth routes for register and login
+        "autoactivateUsers": true, // dont send mail for accept registry
+        "register": true,
+        "login": true,
+        "forgotPassword": true
+    },
+    "mailTransport": { //based on transport config from nodemailer
+        "host": "smtp.example.com",
+        "port": 587,
+        "secure": false,
+        "auth": {
+            "user": "username",
+            "pass": "password"
+        }
+    },
+    "acl": {// declare routes access list for permissions 
+        "public": {
+            "POST-/users/many": false,
+            "POST-/users/": "public",
+            "GET-/users/": "public",
+            "GET-/users/one": "public",
+            "GET-/users/:id": "public",
+            "PUT-/users/findOrCreate": false,
+            "PUT-/users/": "public",
+            "PUT-/users/:id": "public",
+            "DELETE-/users/:id": false
+        },
+        "admin": {
+            "POST-/users/many": "*",
+            "POST-/users/": "*",
+            "GET-/users/": "*",
+            "GET-/users/one": "*",
+            "GET-/users/:id": "*",
+            "PUT-/users/findOrCreate": "*",
+            "PUT-/users/": "*",
+            "PUT-/users/:id": "*",
+            "DELETE-/users/:id": "*"
+        },
+        "client": {
+            "POST-/users/many": "owner,public",
+            "POST-/users/": "owner,public",
+            "GET-/users/": "owner,public",
+            "GET-/users/one": "owner,public",
+            "GET-/users/:id": "owner,public",
+            "PUT-/users/findOrCreate": false,
+            "PUT-/users/": false,
+            "PUT-/users/:id": "owner",
+            "DELETE-/users/:id": false
+        }
+    }
+}
