@@ -252,3 +252,227 @@ curl -X GET "http://localhost:3000/api/orders/?populate[localFields]=userId&popu
 
 * The server will fetch orders and populate the userId field with user documents that include only the name and email
   fields.
+
+## Full example  for python
+
+```python
+import requests
+import json
+
+BASE_URL = "http://localhost:3000/api"
+
+# Helper function to print response
+def print_response(response):
+    print("Status Code:", response.status_code)
+    try:
+        print("Response JSON:", response.json())
+    except json.JSONDecodeError:
+        print("Response Text:", response.text)
+
+# 1. Create Multiple Records
+def create_many_users():
+    url = f"{BASE_URL}/users/many"
+    payload = [
+        {"name": "Alice", "email": "alice@example.com", "age": 30},
+        {"name": "Bob", "email": "bob@example.com", "age": 25}
+    ]
+    headers = {"Content-Type": "application/json"}
+    response = requests.post(url, headers=headers, data=json.dumps(payload))
+    print_response(response)
+
+# 2. Create a Single Record
+def create_user():
+    url = f"{BASE_URL}/users/"
+    payload = {"name": "Charlie", "email": "charlie@example.com", "age": 28}
+    headers = {"Content-Type": "application/json"}
+    response = requests.post(url, headers=headers, data=json.dumps(payload))
+    print_response(response)
+
+# 3. Get Multiple Records
+def get_users():
+    url = f"{BASE_URL}/users/"
+    response = requests.get(url)
+    print_response(response)
+
+# 4. Get a Single Record by ID
+def get_user_by_id(user_id):
+    url = f"{BASE_URL}/users/{user_id}"
+    response = requests.get(url)
+    print_response(response)
+
+# 5. Get a Single Record Based on Conditions
+def get_user_by_condition():
+    url = f"{BASE_URL}/users/one?where[age]=28"
+    response = requests.get(url)
+    print_response(response)
+
+# 6. Update or Create a Record
+def update_or_create_user():
+    url = f"{BASE_URL}/users/findOrCreate"
+    payload = {"name": "David", "email": "david@example.com", "age": 32}
+    headers = {"Content-Type": "application/json"}
+    response = requests.put(url, headers=headers, data=json.dumps(payload))
+    print_response(response)
+
+# 7. Update a Record by ID
+def update_user_by_id(user_id):
+    url = f"{BASE_URL}/users/{user_id}"
+    payload = {"age": 29}
+    headers = {"Content-Type": "application/json"}
+    response = requests.put(url, headers=headers, data=json.dumps(payload))
+    print_response(response)
+
+# 8. Delete a Record by ID
+def delete_user_by_id(user_id):
+    url = f"{BASE_URL}/users/{user_id}"
+    response = requests.delete(url)
+    print_response(response)
+
+# Example usage
+if __name__ == "__main__":
+    create_many_users()
+    create_user()
+    get_users()
+    # Replace 'user_id' with an actual ID from your database
+    user_id = "60d0fe4f5311236168a109ca"  # Example ID
+    get_user_by_id(user_id)
+    get_user_by_condition()
+    update_or_create_user()
+    update_user_by_id(user_id)
+    delete_user_by_id(user_id)
+
+```
+
+## Full example  for javascript
+
+```javascript
+ const axios = require('axios');
+
+const BASE_URL = "http://localhost:3000/api";
+
+// Helper function to print response
+function printResponse(response) {
+    console.log("Status Code:", response.status);
+    console.log("Response Data:", response.data);
+}
+
+// Helper function to print errors
+function printError(error) {
+    if (error.response) {
+        console.log("Error Status Code:", error.response.status);
+        console.log("Error Response Data:", error.response.data);
+    } else {
+        console.log("Error:", error.message);
+    }
+}
+
+// 1. Create Multiple Records
+async function createManyUsers() {
+    const url = `${BASE_URL}/users/many`;
+    const payload = [
+        { name: "Alice", email: "alice@example.com", age: 30 },
+        { name: "Bob", email: "bob@example.com", age: 25 }
+    ];
+    try {
+        const response = await axios.post(url, payload, { headers: { 'Content-Type': 'application/json' } });
+        printResponse(response);
+    } catch (error) {
+        printError(error);
+    }
+}
+
+// 2. Create a Single Record
+async function createUser() {
+    const url = `${BASE_URL}/users/`;
+    const payload = { name: "Charlie", email: "charlie@example.com", age: 28 };
+    try {
+        const response = await axios.post(url, payload, { headers: { 'Content-Type': 'application/json' } });
+        printResponse(response);
+    } catch (error) {
+        printError(error);
+    }
+}
+
+// 3. Get Multiple Records
+async function getUsers() {
+    const url = `${BASE_URL}/users/`;
+    try {
+        const response = await axios.get(url);
+        printResponse(response);
+    } catch (error) {
+        printError(error);
+    }
+}
+
+// 4. Get a Single Record by ID
+async function getUserById(userId) {
+    const url = `${BASE_URL}/users/${userId}`;
+    try {
+        const response = await axios.get(url);
+        printResponse(response);
+    } catch (error) {
+        printError(error);
+    }
+}
+
+// 5. Get a Single Record Based on Conditions
+async function getUserByCondition() {
+    const url = `${BASE_URL}/users/one?where[age]=28`;
+    try {
+        const response = await axios.get(url);
+        printResponse(response);
+    } catch (error) {
+        printError(error);
+    }
+}
+
+// 6. Update or Create a Record
+async function updateOrCreateUser() {
+    const url = `${BASE_URL}/users/findOrCreate`;
+    const payload = { name: "David", email: "david@example.com", age: 32 };
+    try {
+        const response = await axios.put(url, payload, { headers: { 'Content-Type': 'application/json' } });
+        printResponse(response);
+    } catch (error) {
+        printError(error);
+    }
+}
+
+// 7. Update a Record by ID
+async function updateUserById(userId) {
+    const url = `${BASE_URL}/users/${userId}`;
+    const payload = { age: 29 };
+    try {
+        const response = await axios.put(url, payload, { headers: { 'Content-Type': 'application/json' } });
+        printResponse(response);
+    } catch (error) {
+        printError(error);
+    }
+}
+
+// 8. Delete a Record by ID
+async function deleteUserById(userId) {
+    const url = `${BASE_URL}/users/${userId}`;
+    try {
+        const response = await axios.delete(url);
+        printResponse(response);
+    } catch (error) {
+        printError(error);
+    }
+}
+
+// Example usage
+(async () => {
+    await createManyUsers();
+    await createUser();
+    await getUsers();
+    // Replace 'userId' with an actual ID from your database
+    const userId = "60d0fe4f5311236168a109ca";  // Example ID
+    await getUserById(userId);
+    await getUserByCondition();
+    await updateOrCreateUser();
+    await updateUserById(userId);
+    await deleteUserById(userId);
+})();
+
+ ```
