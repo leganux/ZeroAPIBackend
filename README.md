@@ -370,11 +370,11 @@ function printError(error) {
 async function createManyUsers() {
     const url = `${BASE_URL}/users/many`;
     const payload = [
-        { name: "Alice", email: "alice@example.com", age: 30 },
-        { name: "Bob", email: "bob@example.com", age: 25 }
+        {name: "Alice", email: "alice@example.com", age: 30},
+        {name: "Bob", email: "bob@example.com", age: 25}
     ];
     try {
-        const response = await axios.post(url, payload, { headers: { 'Content-Type': 'application/json' } });
+        const response = await axios.post(url, payload, {headers: {'Content-Type': 'application/json'}});
         printResponse(response);
     } catch (error) {
         printError(error);
@@ -384,9 +384,9 @@ async function createManyUsers() {
 // 2. Create a Single Record
 async function createUser() {
     const url = `${BASE_URL}/users/`;
-    const payload = { name: "Charlie", email: "charlie@example.com", age: 28 };
+    const payload = {name: "Charlie", email: "charlie@example.com", age: 28};
     try {
-        const response = await axios.post(url, payload, { headers: { 'Content-Type': 'application/json' } });
+        const response = await axios.post(url, payload, {headers: {'Content-Type': 'application/json'}});
         printResponse(response);
     } catch (error) {
         printError(error);
@@ -429,9 +429,9 @@ async function getUserByCondition() {
 // 6. Update or Create a Record
 async function updateOrCreateUser() {
     const url = `${BASE_URL}/users/findOrCreate`;
-    const payload = { name: "David", email: "david@example.com", age: 32 };
+    const payload = {name: "David", email: "david@example.com", age: 32};
     try {
-        const response = await axios.put(url, payload, { headers: { 'Content-Type': 'application/json' } });
+        const response = await axios.put(url, payload, {headers: {'Content-Type': 'application/json'}});
         printResponse(response);
     } catch (error) {
         printError(error);
@@ -441,9 +441,9 @@ async function updateOrCreateUser() {
 // 7. Update a Record by ID
 async function updateUserById(userId) {
     const url = `${BASE_URL}/users/${userId}`;
-    const payload = { age: 29 };
+    const payload = {age: 29};
     try {
-        const response = await axios.put(url, payload, { headers: { 'Content-Type': 'application/json' } });
+        const response = await axios.put(url, payload, {headers: {'Content-Type': 'application/json'}});
         printResponse(response);
     } catch (error) {
         printError(error);
@@ -476,3 +476,7 @@ async function deleteUserById(userId) {
 })();
 
  ```
+
+## If you want to get information from databse
+
+Visit http://localhost:3000/database/describe
