@@ -38,6 +38,12 @@ Or if you prefer define a custom port for example 5050 to execute and then visit
 zeroAPI run -p 5050
 ````
 
+Or if you wanna create a custom clear datatable, use -d + datatable name
+
+````bash 
+zeroAPI run -p 5050 -d erick
+````
+
 ## How to use
 
 ### Endpoints
@@ -85,6 +91,10 @@ zeroAPI run -p 5050
 - Delete a Record by ID:
     - DELETE /api/:table/:id
         - Description: Delete a record by its ID from the specified table.
+
+- Get statistics like mean, mode, avg, etc of a field:
+    - GET /api/:table/statistics?select=< fields comma separed >
+        - Description: gets statisctics from a column in query
 
 ### Query parameters
 
@@ -477,6 +487,161 @@ async function deleteUserById(userId) {
 
  ```
 
-## If you want to get information from databse
+## If you want to get information from database
 
-Visit http://localhost:3000/database/describe
+Visit GET : http://localhost:3000/database/describe
+
+## Example of statistics endpoint
+
+ ```javascript
+const options = {method: 'GET', headers: {'User-Agent': 'insomnia/2023.5.8'}};
+
+fetch('http://localhost:5051/api/users/statistics?select=age%2Cmonthly_income%2Cdoctor_visits%2Ccountry', options)
+    .then(response => response.json())
+    .then(response => console.log(response))
+    .catch(err => console.error(err));
+
+```
+
+Response example
+
+ ```json
+{
+  "status": 200,
+  "collection": "users",
+  "message": "Get Many Success",
+  "data": {
+    "age": {
+      "statistics": {
+        "count": 20,
+        "sum": 649,
+        "mean": 32.45,
+        "median": 32,
+        "mode": [
+          29
+        ],
+        "min": 22,
+        "max": 45,
+        "range": 23,
+        "std": 6.445735024029455,
+        "variance": 41.5475,
+        "quartiles": {
+          "Q1": 27.75,
+          "Q2": 32,
+          "Q3": 37.25
+        },
+        "iqr": 9.5
+      }
+    },
+    "monthly_income": {
+      "statistics": {
+        "count": 20,
+        "sum": 99400,
+        "mean": 4970,
+        "median": 5050,
+        "mode": [
+          4500,
+          6800
+        ],
+        "min": 2800,
+        "max": 7200,
+        "range": 4400,
+        "std": 1309.6182649917494,
+        "variance": 1715100,
+        "quartiles": {
+          "Q1": 3925,
+          "Q2": 5050,
+          "Q3": 5925
+        },
+        "iqr": 2000
+      }
+    },
+    "doctor_visits": {
+      "statistics": {
+        "count": 18,
+        "sum": 39,
+        "mean": 2.1666666666666665,
+        "median": 2,
+        "mode": [
+          1
+        ],
+        "min": 1,
+        "max": 4,
+        "range": 3,
+        "std": 1.0137937550497031,
+        "variance": 1.0277777777777777,
+        "quartiles": {
+          "Q1": 1,
+          "Q2": 2,
+          "Q3": 3
+        },
+        "iqr": 2
+      }
+    },
+    "country": {
+      "statistics": {
+        "mode": [
+          "USA",
+          "Canada",
+          "UK",
+          "Australia",
+          "New Zealand",
+          "Ireland",
+          "Spain",
+          "Germany",
+          "France",
+          "South Korea",
+          "Italy",
+          "Netherlands",
+          "Japan",
+          "Brazil",
+          "South Africa",
+          "Russia",
+          "Mexico",
+          "Argentina",
+          "China",
+          "India"
+        ],
+        "mostFrequent": [
+          "USA",
+          "Canada",
+          "UK",
+          "Australia",
+          "New Zealand"
+        ],
+        "leastFrequent": [
+          "USA",
+          "Canada",
+          "UK",
+          "Australia",
+          "New Zealand"
+        ],
+        "uniqueValues": [
+          "USA",
+          "Canada",
+          "UK",
+          "Australia",
+          "New Zealand",
+          "Ireland",
+          "Spain",
+          "Germany",
+          "France",
+          "South Korea",
+          "Italy",
+          "Netherlands",
+          "Japan",
+          "Brazil",
+          "South Africa",
+          "Russia",
+          "Mexico",
+          "Argentina",
+          "China",
+          "India"
+        ]
+      }
+    }
+  }
+}
+
+   ```
+

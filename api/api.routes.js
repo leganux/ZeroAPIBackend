@@ -19,7 +19,7 @@ module.exports = function (middleware = false, database = 'api') {
         router.post('/:table/many', middleware, createManyAPI(database));
         router.post('/:table/', middleware, createOneAPI(database));
 
-        router.get('/:table/Statistics', middleware, StatisticsAPI(database));
+        router.get('/:table/statistics', middleware, StatisticsAPI(database));
 
         router.get('/:table/', middleware, getManyAPI(database));
         router.get('/:table/one', middleware, getOneWhereAPI(database));
@@ -34,7 +34,7 @@ module.exports = function (middleware = false, database = 'api') {
         router.post('/:table/many', createManyAPI(database));
         router.post('/:table/', createOneAPI(database));
 
-        router.get('/:table/Statistics', StatisticsAPI(database));
+        router.get('/:table/statistics', StatisticsAPI(database));
 
         router.get('/:table/', getManyAPI(database));
         router.get('/:table/one', getOneWhereAPI(database));

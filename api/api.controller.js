@@ -1,6 +1,7 @@
 const {initializeDb} = require('./../database');
 const {v4: uuidv4} = require('uuid');
-const getStatistics = require("../functions/statistics");
+const {getStatistics, getStatisticsString} = require("../functions/statistics");
+const describe = require("../functions/describe");
 const {ObjectID} = require('tingodb')();
 
 /** This function helps  to create and return seelct fields in mongoose */
@@ -557,12 +558,14 @@ let deleteOneByIdAPI = function (database) {
 let StatisticsAPI = function (database) {
     return async function (req, res) {
         try {
-            const {table} = req.params
-            let {where, whereObject, like, select, paginate, sort, populate, populateFields} = req.query;
+            const {table} = req.params;
+            let {where, like, select, paginate, sort, populate, populateFields, top} = req.query;
+
+            let description = await describe(table, database);
+
 
             let list_of_elements = await finder(table, {
                 where,
-                whereObject,
                 like,
                 select,
                 paginate,
@@ -570,14 +573,41 @@ let StatisticsAPI = function (database) {
                 populate,
                 populateFields,
                 database
-            })
+            });
 
+            let selectioned = selectConstructor(select);
+
+            if (Object.keys(selectioned).length < 1) {
+                return res.status(400).json({
+                    error: 'Select at most one field using query select to execute',
+                    status: 400,
+                    message: 'Bad request'
+                });
+            }
+
+            let arrayOfElements = Object.keys(selectioned).reduce((acc, key) => {
+                acc[key] = list_of_elements
+                    .filter(item => item[key] && typeof item[key] == description[key])
+                    .map(item => item[key]);
+                return acc;
+            }, {});
+            console.table(list_of_elements)
+
+
+            let arrResponse = Object.entries(arrayOfElements).reduce((acc, [key, val]) => {
+                if (description[key] === 'number') {
+                    acc[key] = {type: description[key], statistics: getStatistics(val)};
+                } else if (description[key] === 'string') {
+                    acc[key] = {type: description[key], statistics: getStatisticsString(val, top)};
+                }
+                return acc;
+            }, {});
 
             res.status(200).json({
                 status: 200,
                 collection: table,
                 message: 'Get Many Success',
-                data: list_of_elements
+                data: arrResponse
             });
         } catch (err) {
             console.error(err);

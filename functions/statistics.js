@@ -79,4 +79,35 @@ function getStatistics(arr) {
     };
 }
 
-module.exports = getStatistics
+function getStatisticsString(arr, X = 5) {
+    // Calcular frecuencia de cada elemento
+    const frequency = _.countBy(arr);
+
+    // Convertir frecuencia en un array de [key, count]
+    const freqArray = Object.entries(frequency).map(([key, count]) => ({key, count}));
+
+    // Ordenar por frecuencia descendente
+    const sortedFreqArray = _.orderBy(freqArray, ['count'], ['desc']);
+
+    // Calcular la moda (elementos con mayor frecuencia)
+    const maxFreq = sortedFreqArray[0].count;
+    const mode = sortedFreqArray.filter(item => item.count === maxFreq).map(item => item.key);
+
+    // X más repetidos
+    const mostFrequent = sortedFreqArray.slice(0, X).map(item => item.key);
+
+    // X menos repetidos (ordenado por frecuencia ascendente)
+    const leastFrequent = _.orderBy(freqArray, ['count'], ['asc']).slice(0, X).map(item => item.key);
+
+    // Valores diferentes (que no se repiten)
+    const uniqueValues = freqArray.filter(item => item.count === 1).map(item => item.key);
+
+    return {
+        mode,
+        mostFrequent,
+        leastFrequent,
+        uniqueValues
+    };
+}
+
+module.exports = {getStatistics, getStatisticsString}
