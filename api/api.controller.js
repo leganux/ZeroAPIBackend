@@ -1,5 +1,6 @@
 const {initializeDb} = require('./../database');
 const {v4: uuidv4} = require('uuid');
+const getStatistics = require("../functions/statistics");
 const {ObjectID} = require('tingodb')();
 
 /** This function helps  to create and return seelct fields in mongoose */
@@ -99,12 +100,12 @@ let populateConstructor = async function (populate, populateFields, list_of_elem
 
 }
 let finder = async function (table, options) {
-    let {where, whereObject, like, select, paginate, sort, populate, populateFields} = options;
+    let {where, whereObject, like, select, paginate, sort, populate, populateFields, database} = options;
 
     where = whereConstructor(where)
     like = whereConstructor(like)
 
-    const collection = await initializeDb(table);
+    const collection = await initializeDb(table, database);
 
     let find = {};
 
@@ -156,367 +157,490 @@ let finder = async function (table, options) {
     return list_of_elements
 }
 
-async function createOneAPI(req, res) {
-    try {
-        const {table} = req.params
-        const owner = req?.auth?._id || 'public'
-        const collection = await initializeDb(table);
+let createOneAPI = function (database) {
+    return async function (req, res) {
+        try {
+            const {table} = req.params
+            const owner = req?.auth?._id || 'public'
+            const collection = await initializeDb(table, database);
 
-        let {select, populate, populateFields} = req.query;
+            let {select, populate, populateFields} = req.query;
 
-        const newItem = {...req.body, _id: uuidv4(), createdAt: new Date(), updatedAt: new Date(), owner};
-        await new Promise((resolve, reject) => {
-            collection.insert(newItem, (err, result) => {
-                if (err) return reject(err);
-                resolve(result);
-            });
-        });
-
-        let options = {
-            where: {_id: newItem._id},
-            select, populate, populateFields
-        }
-        let response = await finder(table, options)
-        res.status(200).json({
-            collection: table,
-            status: 200,
-            message: 'Created Success',
-            data: response
-        });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({
-            error: err,
-            status: 500,
-            message: 'Internal server error'
-        });
-    }
-}
-
-async function createManyAPI(req, res) {
-    try {
-        const {table} = req.params
-        const owner = req?.auth?._id || 'public'
-        const collection = await initializeDb(table);
-        let {select, sort, populate, populateFields} = req.query;
-
-
-        let date = new Date()
-        let body = req.body.map(item => {
-            return {...item, _id: uuidv4(), createdAt: date, updatedAt: date, owner}
-        })
-
-        await new Promise((resolve, reject) => {
-            collection.insert(body, (err, result) => {
-                if (err) return reject(err);
-                resolve(result);
-            });
-        });
-
-
-        let ids = body.map(item => {
-            return (item._id)
-        })
-
-        let response = await finder(table, {
-            where: {_id: {$in: ids}},
-            select, sort, populate, populateFields
-        })
-
-        res.status(200).json({
-            status: 200,
-            message: 'Created Many Success',
-            data: response
-        });
-    } catch (err) {
-        res.status(500).json({
-            error: err,
-            status: 500,
-            message: 'Internal server error'
-        });
-    }
-}
-
-async function getManyAPI(req, res) {
-    try {
-        const {table} = req.params
-        let {where, whereObject, like, select, paginate, sort, populate, populateFields} = req.query;
-
-        let list_of_elements = await finder(table, {
-            where,
-            whereObject,
-            like,
-            select,
-            paginate,
-            sort,
-            populate,
-            populateFields
-        })
-
-        res.status(200).json({
-            status: 200,
-            collection: table,
-            message: 'Get Many Success',
-            data: list_of_elements
-        });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({
-            error: err,
-            status: 500,
-            message: 'Internal server error'
-        });
-    }
-}
-
-async function getOneByIdAPI(req, res) {
-    try {
-        const {table, id} = req.params
-        let {select, populate, populateFields} = req.query;
-
-        let list_of_elements = await finder(table, {where: {_id: id}, select, populate, populateFields})
-
-        if (list_of_elements.length < 1) {
-            res.status(404).json({
-                collection: table,
-                status: 404,
-                message: 'Not found',
-                data: {}
-            });
-            return
-        }
-
-        res.status(200).json({
-            status: 200,
-            collection: table,
-            message: 'Get Item Success',
-            data: list_of_elements[0]
-        });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({
-            error: err,
-            status: 500,
-            message: 'Internal server error'
-        });
-    }
-
-}
-
-async function getOneWhereAPI(req, res) {
-    try {
-        const {table} = req.params
-        let {where, whereObject, like, select, sort, populate, populateFields} = req.query;
-
-        let list_of_elements = await finder(table, {where, whereObject, like, select, sort, populate, populateFields})
-
-        res.status(200).json({
-            status: 200,
-            collection: table,
-            message: 'Get Many Success',
-            data: list_of_elements[0]
-        });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({
-            error: err,
-            status: 500,
-            message: 'Internal server error'
-        });
-    }
-
-}
-
-async function updateOneByIDAPI(req, res) {
-    try {
-        const {table, id} = req.params
-        let {select, populate, populateFields} = req.query;
-
-        const collection = await initializeDb(table);
-        const update = {...req.body, updatedAt: new Date()};
-
-        const numReplaced = await new Promise((resolve, reject) => {
-            collection.update({_id: id}, {$set: update}, {}, (err, numReplaced) => {
-                if (err) return reject(err);
-                resolve(numReplaced);
-            });
-        });
-
-        if (numReplaced < 1) {
-            res.status(404).json({
-                collection: table,
-                status: 404,
-                message: 'Not found',
-                data: {}
-            });
-            return
-        }
-        let options = {
-            where: {_id: id},
-            select, populate, populateFields
-        }
-        let response = await finder(table, options)
-
-        res.status(200).json({
-            collection: table,
-            status: 200,
-            message: 'Updated Success',
-            data: response[0]
-        });
-
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({
-            error: err,
-            status: 500,
-            message: 'Internal server error'
-        });
-    }
-}
-
-async function updateWhereAPI(req, res) {
-    try {
-        const {table} = req.params
-        let {where, select, populate, populateFields} = req.query;
-
-        const collection = await initializeDb(table);
-        const update = {...req.body, updatedAt: new Date()};
-
-        let findTochange = await finder(table, {
-            where
-        })
-
-        let ids = findTochange.map(item => {
-            return item._id
-        })
-        where = whereConstructor(where)
-
-        for (let item of ids) {
-            await new Promise((resolve, reject) => {
-                collection.update({_id: item}, {$set: update}, {many: true}, (err, numReplaced) => {
-                    if (err) return reject(err);
-                    resolve(numReplaced);
-                });
-            });
-        }
-        let response = await finder(table, {
-            where: {_id: {$in: ids}}, select, populate, populateFields
-        })
-        res.status(200).json({
-            collection: table,
-            status: 200,
-            message: 'Updated Success',
-            data: response
-        });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({
-            error: err,
-            status: 500,
-            message: 'Internal server error'
-        });
-    }
-}
-
-async function updateOrCreateWhereAPI(req, res) {
-    try {
-        const {table} = req.params
-        const owner = req?.auth?._id || 'public'
-        let {where, select, populate, populateFields} = req.query;
-
-        const collection = await initializeDb(table);
-        const update = {...req.body, updatedAt: new Date()};
-
-        let findTochange = await finder(table, {
-            where
-        })
-
-        let id = ''
-        if (findTochange.length > 0) {
-
-            id = findTochange[0]._id
-            await new Promise((resolve, reject) => {
-                collection.update({_id: id}, {$set: update}, {many: true}, (err, numReplaced) => {
-                    if (err) return reject(err);
-                    resolve(numReplaced);
-                });
-            });
-
-        } else {
-
-            const newItem = {...update, ...where, _id: uuidv4(), createdAt: new Date(), updatedAt: new Date(), owner};
+            const newItem = {...req.body, _id: uuidv4(), createdAt: new Date(), updatedAt: new Date(), owner};
             await new Promise((resolve, reject) => {
                 collection.insert(newItem, (err, result) => {
                     if (err) return reject(err);
                     resolve(result);
                 });
             });
-            id = newItem._id
+
+            let options = {
+                where: {_id: newItem._id},
+                select, populate, populateFields, database
+            }
+            let response = await finder(table, options)
+            res.status(200).json({
+                collection: table,
+                status: 200,
+                message: 'Created Success',
+                data: response
+            });
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({
+                error: err,
+                status: 500,
+                message: 'Internal server error'
+            });
         }
-
-        let response = await finder(table, {
-            where: {_id: id}, select, populate, populateFields
-        })
-
-        res.status(200).json({
-            collection: table,
-            status: 200,
-            message: 'Uupdated or Created Success',
-            data: response
-        });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({
-            error: err,
-            status: 500,
-            message: 'Internal server error'
-        });
     }
 }
 
-async function deleteOneByIdAPI(req, res) {
-    try {
-        const {table, id} = req.params
+let createManyAPI = function (database) {
+    return async function (req, res) {
+        try {
+            const {table} = req.params
+            const owner = req?.auth?._id || 'public'
+            const collection = await initializeDb(table, database);
+            let {select, sort, populate, populateFields} = req.query;
 
-        const collection = await initializeDb(table);
 
-        const numRemoved = await new Promise((resolve, reject) => {
-            collection.remove({_id: id}, {}, (err, numRemoved) => {
-                if (err) return reject(err);
-                resolve(numRemoved);
+            let date = new Date()
+            let body = req.body.map(item => {
+                return {...item, _id: uuidv4(), createdAt: date, updatedAt: date, owner}
+            })
+
+            await new Promise((resolve, reject) => {
+                collection.insert(body, (err, result) => {
+                    if (err) return reject(err);
+                    resolve(result);
+                });
             });
-        });
 
-        if (numRemoved < 1) {
-            res.status(404).json({
+
+            let ids = body.map(item => {
+                return (item._id)
+            })
+
+            let response = await finder(table, {
+                where: {_id: {$in: ids}},
+                select, sort, populate, populateFields, database
+            })
+
+            res.status(200).json({
+                status: 200,
+                message: 'Created Many Success',
+                data: response
+            });
+        } catch (err) {
+            res.status(500).json({
+                error: err,
+                status: 500,
+                message: 'Internal server error'
+            });
+        }
+    }
+}
+
+let getManyAPI = function (database) {
+    return async function (req, res) {
+        try {
+            const {table} = req.params
+            let {where, whereObject, like, select, paginate, sort, populate, populateFields} = req.query;
+
+            let list_of_elements = await finder(table, {
+                where,
+                whereObject,
+                like,
+                select,
+                paginate,
+                sort,
+                populate,
+                populateFields, database
+            })
+
+            res.status(200).json({
+                status: 200,
                 collection: table,
-                status: 404,
-                message: 'Not found',
+                message: 'Get Many Success',
+                data: list_of_elements
+            });
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({
+                error: err,
+                status: 500,
+                message: 'Internal server error'
+            });
+        }
+    }
+}
+
+
+let getOneByIdAPI = function (database) {
+    return async function (req, res) {
+        try {
+            const {table, id} = req.params
+            let {select, populate, populateFields} = req.query;
+
+            let list_of_elements = await finder(table, {where: {_id: id}, select, populate, populateFields, database})
+
+            if (list_of_elements.length < 1) {
+                res.status(404).json({
+                    collection: table,
+                    status: 404,
+                    message: 'Not found',
+                    data: {}
+                });
+                return
+            }
+
+            res.status(200).json({
+                status: 200,
+                collection: table,
+                message: 'Get Item Success',
+                data: list_of_elements[0]
+            });
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({
+                error: err,
+                status: 500,
+                message: 'Internal server error'
+            });
+        }
+
+    }
+}
+
+
+let getOneWhereAPI = function (database) {
+    return async function (req, res) {
+        try {
+            const {table} = req.params
+            let {where, whereObject, like, select, sort, populate, populateFields} = req.query;
+
+            let list_of_elements = await finder(table, {
+                where,
+                whereObject,
+                like,
+                select,
+                sort,
+                populate,
+                populateFields,
+                database
+            })
+
+            res.status(200).json({
+                status: 200,
+                collection: table,
+                message: 'Get Many Success',
+                data: list_of_elements[0]
+            });
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({
+                error: err,
+                status: 500,
+                message: 'Internal server error'
+            });
+        }
+
+    }
+}
+
+
+let updateOneByIDAPI = function (database) {
+    return async function (req, res) {
+        try {
+            const {table, id} = req.params
+            let {select, populate, populateFields} = req.query;
+
+            const collection = await initializeDb(table, database);
+            const update = {...req.body, updatedAt: new Date()};
+
+            const numReplaced = await new Promise((resolve, reject) => {
+                collection.update({_id: id}, {$set: update}, {}, (err, numReplaced) => {
+                    if (err) return reject(err);
+                    resolve(numReplaced);
+                });
+            });
+
+            if (numReplaced < 1) {
+                res.status(404).json({
+                    collection: table,
+                    status: 404,
+                    message: 'Not found',
+                    data: {}
+                });
+                return
+            }
+            let options = {
+                where: {_id: id},
+                select, populate, populateFields, database
+            }
+            let response = await finder(table, options)
+
+            res.status(200).json({
+                collection: table,
+                status: 200,
+                message: 'Updated Success',
+                data: response[0]
+            });
+
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({
+                error: err,
+                status: 500,
+                message: 'Internal server error'
+            });
+        }
+    }
+}
+
+
+let updateWhereAPI = function (database) {
+    return async function (req, res) {
+        try {
+            const {table} = req.params
+            let {where, select, populate, populateFields} = req.query;
+
+            const collection = await initializeDb(table, database);
+            const update = {...req.body, updatedAt: new Date()};
+
+            let findTochange = await finder(table, {
+                where, database
+            })
+
+            let ids = findTochange.map(item => {
+                return item._id
+            })
+            where = whereConstructor(where)
+
+            for (let item of ids) {
+                await new Promise((resolve, reject) => {
+                    collection.update({_id: item}, {$set: update}, {many: true}, (err, numReplaced) => {
+                        if (err) return reject(err);
+                        resolve(numReplaced);
+                    });
+                });
+            }
+            let response = await finder(table, {
+                where: {_id: {$in: ids}}, select, populate, populateFields, database
+            })
+            res.status(200).json({
+                collection: table,
+                status: 200,
+                message: 'Updated Success',
+                data: response
+            });
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({
+                error: err,
+                status: 500,
+                message: 'Internal server error'
+            });
+        }
+    }
+}
+
+
+let updateOrCreateWhereAPI = function (database) {
+    return async function (req, res) {
+        try {
+            const {table} = req.params
+            const owner = req?.auth?._id || 'public'
+            let {where, select, populate, populateFields} = req.query;
+
+            const collection = await initializeDb(table, database);
+            const update = {...req.body, updatedAt: new Date()};
+
+            let findTochange = await finder(table, {
+                where, database
+            })
+
+            let id = ''
+            if (findTochange.length > 0) {
+
+                id = findTochange[0]._id
+                await new Promise((resolve, reject) => {
+                    collection.update({_id: id}, {$set: update}, {many: true}, (err, numReplaced) => {
+                        if (err) return reject(err);
+                        resolve(numReplaced);
+                    });
+                });
+
+            } else {
+
+                const newItem = {
+                    ...update, ...where,
+                    _id: uuidv4(),
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                    owner
+                };
+                await new Promise((resolve, reject) => {
+                    collection.insert(newItem, (err, result) => {
+                        if (err) return reject(err);
+                        resolve(result);
+                    });
+                });
+                id = newItem._id
+            }
+
+            let response = await finder(table, {
+                where: {_id: id}, select, populate, populateFields, database
+            })
+
+            res.status(200).json({
+                collection: table,
+                status: 200,
+                message: 'Uupdated or Created Success',
+                data: response
+            });
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({
+                error: err,
+                status: 500,
+                message: 'Internal server error'
+            });
+        }
+    }
+}
+
+
+let deleteOneByIdAPI = function (database) {
+    return async function (req, res) {
+        try {
+            const {table, id} = req.params
+
+            const collection = await initializeDb(table, database);
+
+            const numRemoved = await new Promise((resolve, reject) => {
+                collection.remove({_id: id}, {}, (err, numRemoved) => {
+                    if (err) return reject(err);
+                    resolve(numRemoved);
+                });
+            });
+
+            if (numRemoved < 1) {
+                res.status(404).json({
+                    collection: table,
+                    status: 404,
+                    message: 'Not found',
+                    data: {}
+                });
+                return
+            }
+
+            res.status(200).json({
+                collection: table,
+                status: 200,
+                message: 'Deleted Success',
                 data: {}
             });
-            return
+
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({
+                error: err,
+                status: 500,
+                message: 'Internal server error'
+            });
         }
-
-        res.status(200).json({
-            collection: table,
-            status: 200,
-            message: 'Deleted Success',
-            data: {}
-        });
-
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({
-            error: err,
-            status: 500,
-            message: 'Internal server error'
-        });
     }
 }
+
+let StatisticsAPI = function (database) {
+    return async function (req, res) {
+        try {
+            const {table} = req.params
+            let {where, whereObject, like, select, paginate, sort, populate, populateFields} = req.query;
+
+            let list_of_elements = await finder(table, {
+                where,
+                whereObject,
+                like,
+                select,
+                paginate,
+                sort,
+                populate,
+                populateFields,
+                database
+            })
+
+
+            res.status(200).json({
+                status: 200,
+                collection: table,
+                message: 'Get Many Success',
+                data: list_of_elements
+            });
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({
+                error: err,
+                status: 500,
+                message: 'Internal server error'
+            });
+        }
+    }
+}
+
 
 module.exports = {
     createOneAPI,
     createManyAPI,
     getManyAPI,
-    getOneByIdAPI, getOneWhereAPI, updateOneByIDAPI, updateWhereAPI, updateOrCreateWhereAPI, deleteOneByIdAPI
+    StatisticsAPI,
+    getOneByIdAPI,
+    getOneWhereAPI,
+    updateOneByIDAPI,
+    updateWhereAPI,
+    updateOrCreateWhereAPI,
+    deleteOneByIdAPI
 };
+
+/*
+* Todo /statistics
+*  * count
+*  * sum
+*  * mean or avg
+*  * median
+*  * mode
+*  * min
+*  * max
+*  * range
+*  * std
+*  * variance
+*  * quertiles (1,2,3)
+*  * rango interquartilico (quartil 3 - quartil 4)
+*
+*  [strings]
+*   * +frequency
+*   * -frequency
+*   * top X appareances
+*   * mode
+*   * diferences
+*
+*   Transformaciones
+*
+*  * logaritmica log 10 y numero
+*  * etiquetas a numeros
+*  * remplazo
+*  * redondeo
+*  * ceil
+*  * floor
+*  * relleno [ median, mean, mode  ]
+*  * tipificacion (x - media ) / desvicion estandar
+*  *
+*
+* Correlacion
+*
+*
+*
+*
+* */

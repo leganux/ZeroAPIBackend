@@ -5,13 +5,16 @@ const express = require('express');
 const apiRoutes = require('./api/api.routes');
 const coreRoutes = require('./core/core.routes');
 const bodyParser = require('body-parser');
+const morgan = require('morgan')
+
 
 program
     .command('run')
     .description('Starts services for ZeroApiBackend')
     .option('-p, --port <port...>', 'Port where the app will run')
+    .option('-d, --database <database...>', 'Custom database name to store information')
     .option('-c, --config <config...>', 'The path of json config file for ACL and defualt configs ')
-    .action(async function ({port, config}) {
+    .action(async function ({port, config, database}) {
 
         console.log(`
           ______                      _____ _____ ____             _                  _ 
@@ -34,19 +37,37 @@ program
             port = Number(port[0])
         }
 
+        if (!database || database.legth < 1) {
+            database = 'api';
+        } else {
+            database = (database[0])
+        }
+
 
         let app = express();
 
         let middleware = false
         let core = true
+
         let options = {
-            login: true, register: true, forgotPassword: true, autoactivate: true
+            login: true, register: true, forgotPassword: true, autoactivate: true, database
         }
+
+
+        app.use(morgan(function (tokens, req, res) {
+            return [
+                tokens.method(req, res),
+                tokens.url(req, res),
+                tokens.status(req, res),
+                tokens.res(req, res, 'content-length'), '-',
+                tokens['response-time'](req, res), 'ms'
+            ].join(' ')
+        }))
 
         app.use(bodyParser.urlencoded({extended: true}));
         app.use(bodyParser.json());
 
-        app.use('/api', apiRoutes(middleware));
+        app.use('/api', apiRoutes(middleware, database));
         app.use('/', coreRoutes(core, options));
 
         app.all('/', function (req, res) {

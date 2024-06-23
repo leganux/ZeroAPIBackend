@@ -8,43 +8,43 @@ const {
     updateOneByIDAPI,
     updateWhereAPI,
     updateOrCreateWhereAPI,
-    deleteOneByIdAPI
+    deleteOneByIdAPI, StatisticsAPI
 } = require('./api.controller');
 
 const router = express.Router();
 
 
-
-
-
-
-module.exports = function (middleware = false) {
+module.exports = function (middleware = false, database = 'api') {
     if (middleware) {
-        router.post('/:table/many', middleware, createManyAPI);
-        router.post('/:table/', middleware, createOneAPI);
+        router.post('/:table/many', middleware, createManyAPI(database));
+        router.post('/:table/', middleware, createOneAPI(database));
 
-        router.get('/:table/', middleware, getManyAPI);
-        router.get('/:table/one', middleware, getOneWhereAPI);
-        router.get('/:table/:id', middleware, getOneByIdAPI);
+        router.get('/:table/Statistics', middleware, StatisticsAPI(database));
 
-        router.put('/:table/findOrCreate', middleware, updateOrCreateWhereAPI);
-        router.put('/:table/:id', middleware, updateOneByIDAPI);
-        router.put('/:table/', middleware, updateWhereAPI);
+        router.get('/:table/', middleware, getManyAPI(database));
+        router.get('/:table/one', middleware, getOneWhereAPI(database));
+        router.get('/:table/:id', middleware, getOneByIdAPI(database));
 
-        router.delete('/:table/:id', middleware, deleteOneByIdAPI);
+        router.put('/:table/findOrCreate', middleware, updateOrCreateWhereAPI(database));
+        router.put('/:table/:id', middleware, updateOneByIDAPI(database));
+        router.put('/:table/', middleware, updateWhereAPI(database));
+
+        router.delete('/:table/:id', middleware, deleteOneByIdAPI(database));
     } else {
-        router.post('/:table/many', createManyAPI);
-        router.post('/:table/', createOneAPI);
+        router.post('/:table/many', createManyAPI(database));
+        router.post('/:table/', createOneAPI(database));
 
-        router.get('/:table/', getManyAPI);
-        router.get('/:table/one', getOneWhereAPI);
-        router.get('/:table/:id', getOneByIdAPI);
+        router.get('/:table/Statistics', StatisticsAPI(database));
 
-        router.put('/:table/findOrCreate', updateOrCreateWhereAPI);
-        router.put('/:table/:id', updateOneByIDAPI);
-        router.put('/:table/', updateWhereAPI);
+        router.get('/:table/', getManyAPI(database));
+        router.get('/:table/one', getOneWhereAPI(database));
+        router.get('/:table/:id', getOneByIdAPI(database));
 
-        router.delete('/:table/:id', deleteOneByIdAPI);
+        router.put('/:table/findOrCreate', updateOrCreateWhereAPI(database));
+        router.put('/:table/:id', updateOneByIDAPI(database));
+        router.put('/:table/', updateWhereAPI(database));
+
+        router.delete('/:table/:id', deleteOneByIdAPI(database));
     }
     return router
 };
