@@ -1,16 +1,28 @@
 # ZeroAPIBackend
 
-The first Zero code API backend - API rest ready to be consumed, no database needed no definition or code neeeded
+The world's first API-ready database with a REST interface
 
-ZeroAPIBackend is a CLI tool that allows you to instantly create a REST API by simply running zeroAPI run -p 5050. This
-tool requires no database setup, table definitions, or complex configurations. Everything is generated on the fly,
-offering a hassle-free solution for rapid API development.
+ZeroAPIBackend is a CLI tool that allows you to instantly create a Database - REST API by simply running the "zeroAPI
+run" command.
+
+This database tool requires no database setup because it is also a database, and you don't need to define tables or
+perform complex configurations. Everything is generated on the fly when you consume an endpoint, offering a hassle-free
+solution for rapid API development for developers and data experts.
 
 ## Features
 
-* <b>Automatic API Creation:</b> Launch a fully functional REST API with a single command.
-* <b>No Database Setup Required:</b>  Avoid the complexities of setting up and managing a database.
-* <b>Dynamic Table Handling:</b>  Create, read, update, and delete records in any table without predefined schemas.
+* Automatic API Creation: Launch a fully functional REST API with a single command.
+* No Database Setup Required: Avoid the complexities of setting up and managing a database.
+* Dynamic Table Handling: Create, read, update, and delete records in any table without predefined schemas.
+* Designed for Data Analysts: Obtain the data dictionary easily via an endpoint, and by running the CLI with the -d
+  parameter, you can automatically generate a completely clean new database.
+* Data Cleaning and Statistics Endpoints: Automatically obtain statistics like mean, median, mode, standard deviation,
+  quartiles, etc.
+* Frontend-Based Queries: Perform all queries directly from the frontend, without needing to write backend code or
+  install any database engine.
+* Advanced Security: Protect your queries with an ACL configuration JSON and JWT Bearer token-based authentication.
+* Automatic public share endpoints across (ngrok plugin)
+* Dunp
 
 ## Get started
 
@@ -24,9 +36,11 @@ offering a hassle-free solution for rapid API development.
 npm install -g zeroapibackend
 ````
 
+## How to use
+
 ### Run
 
-To execute in default port 3000 only run and then visit http://localhost:3000
+To execute in default port 3000 and default database only run and then visit http://localhost:3000
 
 ````bash 
 zeroAPI run
@@ -38,13 +52,67 @@ Or if you prefer define a custom port for example 5050 to execute and then visit
 zeroAPI run -p 5050
 ````
 
-Or if you wanna create a custom clear datatable, use -d + datatable name
+Or if you want to use a new custom clear datatable use -d + datatable name
 
 ````bash 
 zeroAPI run -p 5050 -d erick
 ````
 
-## How to use
+Or if you want to publish on internet your API using ngrok
+
+````bash 
+zeroAPI run -p 5050 -d erick -ngr <true or ngrok token string>
+````
+
+### Commands
+
+### zeroAPI dump Command
+
+Description
+Dumps a specified database by name.
+
+Options
+
+* -d, --dir <dir...>: Full path directory where the dump will be saved.
+* -n, --name <name...>: Database name.
+
+Usage Example
+
+```bash
+zeroAPI dump --name myDatabase --dir /path/to/save/dump
+```
+
+### zeroAPI restore Command
+
+Description
+Restores a database from a specified ZIP file. 
+
+**Note :This function will replace all registers in the target database.
+
+Options
+
+* -d, --dir <dir...>: Full path directory of the source ZIP file.
+* -n, --name <name...>: Database name.
+  Usage Example
+
+```bash
+zeroAPI restore --name myDatabase --dir /path/to/zip/file.zip
+```
+
+### zeroAPI drop Command
+
+Description
+Drops a specified database by name.
+
+Options
+
+* -n, --name <name...>: Database name.
+
+Usage Example
+
+```bash
+zeroAPI drop --name myDatabase
+```
 
 ### Endpoints
 
