@@ -87,7 +87,7 @@ program
 
         await app.listen(port)
         let url
-        console.log(ngr)
+
         if (ngr && ngr.length > 0) {
             ngr = ngr[0]
             console.log('Try to connect ngrok ' + ngr)

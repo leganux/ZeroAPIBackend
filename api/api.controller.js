@@ -2,7 +2,13 @@ const {initializeDb} = require('./../database');
 const {v4: uuidv4} = require('uuid');
 const {getStatistics, getStatisticsString} = require("../functions/statistics");
 const describe = require("../functions/describe");
-const {ObjectID} = require('tingodb')();
+const path = require("path");
+const fsextra = require("fs-extra");
+
+const XLSX = require('xlsx');
+const fs = require('fs');
+const moment = require("moment");
+
 
 /** This function helps  to create and return seelct fields in mongoose */
 let selectConstructor = function (select) {
@@ -447,7 +453,6 @@ let updateWhereAPI = function (database) {
     }
 }
 
-
 let updateOrCreateWhereAPI = function (database) {
     return async function (req, res) {
         try {
@@ -620,8 +625,465 @@ let StatisticsAPI = function (database) {
     }
 }
 
+let split = function (database) {
+    return async function (req, res) {
+        try {
+            const {table} = req.params;
+            const owner = req?.auth?._id || 'public'
+            let {catalogs, skip} = req.body;
+            if (catalogs && typeof catalogs == 'string') {
+                catalogs = catalogs.split(',')
+            }
+            if (skip && typeof skip == 'string') {
+                skip = skip.split(',')
+            }
+            if (!catalogs) {
+                catalogs = []
+            }
+            if (!skip) {
+                skip = []
+            }
+
+
+            let list_of_elements = await finder(table, {
+                database
+            });
+            let total = list_of_elements.length
+            let count = 0
+
+            for (let item of list_of_elements) {
+                let percent = (count * 100) / total
+                count++
+                console.log('************ Completed: ' + percent + '% ******************')
+                console.log('************ Porccess: ' + count + '/' + total + ' ******************')
+                for (let [key, val] of Object.entries(item)) {
+                    if (skip.includes(key) || key == 'createdAt' || key == 'updatedAt') {
+                        console.log('** Skip ' + key)
+                        continue
+                    }
+                    let newTable = ''
+                    let wasArray = false
+
+                    if (typeof val == 'object') {
+                        newTable = key
+                        if (Array.isArray(val)) {
+                            wasArray = true
+                            let newTableRelation = 'relation_' + table + '_' + key
+                            for (let jtem of val) {
+                                let found = await finder(newTable, {where: jtem, database})
+                                let id_relation = false
+                                if (found && found.length > 0) {
+                                    id_relation = found[0]._id
+                                } else {
+                                    const newItem = {
+                                        ...jtem,
+                                        _id: uuidv4(),
+                                        createdAt: new Date(),
+                                        updatedAt: new Date(),
+                                        owner
+                                    };
+                                    const collection = await initializeDb(newTable, database);
+                                    await new Promise((resolve, reject) => {
+                                        collection.insert(newItem, (err, result) => {
+                                            if (err) return reject(err);
+                                            resolve(result);
+                                        });
+                                    });
+                                    id_relation = newItem._id
+
+                                }
+                                let newItem_inner = {
+                                    _id: uuidv4(),
+                                    createdAt: new Date(),
+                                    updatedAt: new Date(),
+                                    owner
+                                };
+                                newItem_inner[table] = item._id
+                                newItem_inner[newTable] = id_relation
+
+                                console.log('** Insert Relation' + newTableRelation, newItem_inner)
+                                let innercollection = await initializeDb(newTableRelation, database);
+                                await new Promise((resolve, reject) => {
+                                    innercollection.insert(newItem_inner, (err, result) => {
+                                        if (err) return reject(err);
+                                        resolve(result);
+                                    });
+                                });
+
+                            }
+
+                        } else {
+                            let id__ = false
+                            newTable = table + '_' + key
+                            let found = await finder(newTable, {where: val, database})
+                            if (found && found.length > 0) {
+                                id__ = found[0]._id
+                            } else {
+                                const newItem = {
+                                    ...val,
+                                    _id: uuidv4(),
+                                    createdAt: new Date(),
+                                    updatedAt: new Date(),
+                                    owner
+                                };
+
+                                const collection = await initializeDb(newTable, database);
+                                await new Promise((resolve, reject) => {
+                                    collection.insert(newItem, (err, result) => {
+                                        if (err) return reject(err);
+                                        resolve(result);
+                                    });
+                                });
+
+                                id__ = newItem._id
+                                console.log('** Insert  object ' + newTable, newItem)
+                            }
+
+                            const collection_ = await initializeDb(table, database);
+                            const update = {updatedAt: new Date()};
+                            update[key] = id__
+
+                            await new Promise((resolve, reject) => {
+                                collection_.update({_id: item._id}, {$set: update}, {}, (err, numReplaced) => {
+                                    if (err) return reject(err);
+                                    resolve(numReplaced);
+                                });
+                            });
+
+
+                        }
+                    } else if (catalogs.includes(key)) {
+
+
+                        let id__ = false
+                        newTable = table + '_' + key
+                        let where = {}
+                        where[key] = val
+                        let found = await finder(newTable, {where: where, database})
+                        if (found && found.length > 0) {
+                            id__ = found[0]._id
+                        } else {
+                            const newItem = {
+                                ...where,
+                                _id: uuidv4(),
+                                createdAt: new Date(),
+                                updatedAt: new Date(),
+                                owner
+                            };
+                            const collection = await initializeDb(newTable, database);
+                            await new Promise((resolve, reject) => {
+                                collection.insert(newItem, (err, result) => {
+                                    if (err) return reject(err);
+                                    resolve(result);
+                                });
+                            });
+
+                            id__ = newItem._id
+                            console.log('** Insert catalogue ' + newTable, newItem)
+                        }
+
+                        const collection_ = await initializeDb(table, database);
+                        const update = {updatedAt: new Date()};
+                        update[key] = id__
+
+                        await new Promise((resolve, reject) => {
+                            collection_.update({_id: item._id}, {$set: update}, {}, (err, numReplaced) => {
+                                if (err) return reject(err);
+                                resolve(numReplaced);
+                            });
+                        });
+
+
+                    }
+
+                    if (wasArray) {
+                        const collection = await initializeDb(table, database);
+                        const update = {updatedAt: new Date()};
+                        update[key] = undefined
+
+                        await new Promise((resolve, reject) => {
+                            collection.update({_id: item._id}, {$set: update}, {}, (err, numReplaced) => {
+                                if (err) return reject(err);
+                                resolve(numReplaced);
+                            });
+                        });
+                    }
+
+                }
+            }
+
+            let list_of_elements_new = await finder(table, {
+                database
+            });
+
+            res.status(200).json({
+                status: 200,
+                collection: table,
+                message: 'Split Success',
+                data: list_of_elements_new
+            });
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({
+                error: err,
+                status: 500,
+                message: 'Internal server error'
+            });
+        }
+    }
+}
+
+let drop = function (database) {
+    return async function (req, res) {
+        try {
+            const {table} = req.params
+
+
+            let dest = path.join(__dirname, '..', 'local', database, table)
+            await fsextra.remove(dest);
+            console.log('Table dropped  correctly ')
+
+
+            res.status(200).json({
+                collection: table,
+                status: 200,
+                message: 'Table dropped  correctly',
+                data: dest
+            });
+
+        } catch (e) {
+            console.error(e);
+            res.status(500).json({
+                error: e,
+                status: 500,
+                message: 'Internal server error'
+            });
+        }
+    }
+}
+
+let xlsx = function (database) {
+    return async function (req, res) {
+        try {
+            const {table} = req.params
+            let {where, whereObject, like, select, paginate, sort, populate, populateFields} = req.query;
+
+            let list_of_elements = await finder(table, {
+                where,
+                whereObject,
+                like,
+                select,
+                paginate,
+                sort,
+                populate,
+                populateFields, database
+            })
+
+
+            const workbook = XLSX.utils.book_new();
+            const worksheet = XLSX.utils.json_to_sheet(list_of_elements);
+
+            XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
+            const excelBuffer = XLSX.write(workbook, {bookType: 'xlsx', type: 'buffer'});
+
+            let name = moment().format('YYYYMMDDHHmmss') + '_' + database + '_' + table + '.xlsx'
+            res.status(200)
+                .set({
+                    'Content-Disposition': 'attachment; filename="' + name + '"',
+                    'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                })
+                .send(excelBuffer);
+
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({
+                error: err,
+                status: 500,
+                message: 'Internal server error'
+            });
+        }
+    }
+}
+let json = function (database) {
+    return async function (req, res) {
+        try {
+            if (!req.file) {
+                return res.status(400).send('File not uploaded.');
+            }
+            const {table} = req.params
+            const {avoidDuplicates} = req.query
+            const owner = req?.auth?._id || 'public'
+            const collection = await initializeDb(table, database);
+
+            let jsonData = JSON.parse(req.file.buffer.toString());
+            if (!Array.isArray(jsonData)) {
+                jsonData = [jsonData]
+            }
+
+
+            if (avoidDuplicates && avoidDuplicates.id && avoidDuplicates.push) {
+                let obj = {};
+                jsonData.forEach(item => {
+                    const itemId = item[avoidDuplicates.id];
+                    if (!obj[itemId]) {
+                        obj[itemId] = {...item};
+                        if (Array.isArray(avoidDuplicates.push)) {
+                            avoidDuplicates.push.forEach(field => {
+                                obj[itemId][field] = [...item[field]]; // Inicializa como un array con el primer valor
+                            });
+                        } else if (typeof avoidDuplicates.push === 'string') {
+                            const fieldsToPush = avoidDuplicates.push.split(',');
+                            fieldsToPush.forEach(field => {
+                                obj[itemId][field] = [...item[field]]; // Inicializa como un array con el primer valor
+                            });
+                        }
+                    } else {
+                        // Si ya existe el objeto, concatena los arrays correspondientes
+                        if (Array.isArray(avoidDuplicates.push)) {
+                            avoidDuplicates.push.forEach(field => {
+                                if (item[field]) {
+                                    obj[itemId][field].push(...item[field]);
+                                }
+                            });
+                        } else if (typeof avoidDuplicates.push === 'string') {
+                            const fieldsToPush = avoidDuplicates.push.split(',');
+                            fieldsToPush.forEach(field => {
+                                if (item[field]) {
+                                    obj[itemId][field].push(...item[field]);
+                                }
+                            });
+                        }
+                    }
+                });
+
+                // Convertir el objeto de nuevo a un array
+                jsonData = Object.values(obj);
+            }
+
+            let date = new Date()
+            let body = jsonData.map(item => {
+                return {...item, _id: uuidv4(), createdAt: date, updatedAt: date, owner}
+            })
+
+
+            await new Promise((resolve, reject) => {
+                collection.insert(body, (err, result) => {
+                    if (err) return reject(err);
+                    resolve(result);
+                });
+            });
+
+            res.status(200).json({
+                status: 200,
+                message: 'Created Many Success',
+                data: {},
+                length: jsonData.length
+            });
+
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({
+                error: err,
+                status: 500,
+                message: 'Internal server error'
+            });
+        }
+    }
+}
+let xlsx_upload = function (database) {
+    return async function (req, res) {
+        try {
+            const {table} = req.params
+            if (!req.file) {
+                return res.status(400).send('File not uploaded.');
+            }
+
+            const owner = req?.auth?._id || 'public'
+            const workbook = XLSX.read(req.file.buffer, {type: 'buffer'});
+
+
+            let tables = []
+
+            for (let sheetName of workbook.SheetNames) {
+                const worksheet = workbook.Sheets[sheetName];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+
+                const collection = await initializeDb('xls_' + table + '_' + sheetName, database);
+                tables.push('xls_' + table + '_' + sheetName)
+                let date = new Date()
+                let body = jsonData.map(item => {
+                    return {...item, _id: uuidv4(), createdAt: date, updatedAt: date, owner}
+                })
+
+                await new Promise((resolve, reject) => {
+                    collection.insert(body, (err, result) => {
+                        if (err) return reject(err);
+                        resolve(result);
+                    });
+                });
+
+            }
+
+            res.status(200).json({
+                collection: table,
+                status: 200,
+                message: 'Excel Imported correctly',
+                data: {tables}
+            });
+
+        } catch (e) {
+            console.error(e);
+            res.status(500).json({
+                error: e,
+                status: 500,
+                message: 'Internal server error'
+            });
+        }
+    }
+}
+
+let transform = function (database) {
+    return async function (req, res) {
+        try {
+            const {table, to} = req.params
+            let {where, whereObject, like, select, paginate, sort, populate, populateFields} = req.query;
+
+            let list_of_elements = await finder(table, {
+                where,
+                whereObject,
+                like,
+                select,
+                paginate,
+                sort,
+                populate,
+                populateFields, database
+            })
+
+
+            res.status(200).json({
+                status: 200,
+                collection: table,
+                message: 'Get Many Success',
+                data: list_of_elements
+            });
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({
+                error: err,
+                status: 500,
+                message: 'Internal server error'
+            });
+        }
+    }
+}
 
 module.exports = {
+    json,
+    transform,
+    xlsx,
+    drop,
+    split,
     createOneAPI,
     createManyAPI,
     getManyAPI,
@@ -631,45 +1093,23 @@ module.exports = {
     updateOneByIDAPI,
     updateWhereAPI,
     updateOrCreateWhereAPI,
-    deleteOneByIdAPI
+    deleteOneByIdAPI, xlsx_upload
 };
 
 /*
-* Todo /statistics
-*  * count
-*  * sum
-*  * mean or avg
-*  * median
-*  * mode
-*  * min
-*  * max
-*  * range
-*  * std
-*  * variance
-*  * quertiles (1,2,3)
-*  * rango interquartilico (quartil 3 - quartil 4)
+*   TODO: Transformaciones
 *
-*  [strings]
-*   * +frequency
-*   * -frequency
-*   * top X appareances
-*   * mode
-*   * diferences
+*   logaritmica log 10 y numero
+*   etiquetas a numeros
+*   remplazo
+*   redondeo
+*   ceil
+*   floor
+*   relleno [ median, mean, mode  ]
+*   tipificacion (x - media ) / desvicion estandar
+    Correlacion
 *
-*   Transformaciones
-*
-*  * logaritmica log 10 y numero
-*  * etiquetas a numeros
-*  * remplazo
-*  * redondeo
-*  * ceil
-*  * floor
-*  * relleno [ median, mean, mode  ]
-*  * tipificacion (x - media ) / desvicion estandar
-*  *
-*
-* Correlacion
-*
+*  logaritmic,number_tag,replace(object),ceil,floor,fill(object),
 *
 *
 *
