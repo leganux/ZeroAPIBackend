@@ -1,16 +1,19 @@
 #! /usr/bin/env node
-const {program} = require('commander')
-
+const { program } = require('commander');
 const express = require('express');
 const apiRoutes = require('./api/api.routes');
 const coreRoutes = require('./core/core.routes');
 const bodyParser = require('body-parser');
-const morgan = require('morgan')
+const morgan = require('morgan');
 const ngrok = require('ngrok');
-const {dump, restore} = require("./functions/dumpAndrestore");
+const { dump, restore } = require("./functions/dumpAndrestore");
 const fs = require('fs-extra');
 const path = require('path');
 const moment = require('moment');
+const os = require('os');
+
+// Database connections
+const { connectTingoDB, connectMongoDB, connectSQLite } = require('./database');
 
 
 program
@@ -18,9 +21,57 @@ program
     .description('Starts services for ZeroApiBackend')
     .option('-p, --port <port...>', 'Port where the app will run')
     .option('-d, --database <database...>', 'Custom database name to store information')
-    .option('-c, --config <config...>', 'The path of json config file for ACL and configs ')
-    .option('-n, --ngr <ngr...>', 'true or ngrok token to automatically make public your database to the world. (Ensure you protect your endpoints) ')
-    .action(async function ({port, config, database, ngr}) {
+    .option('-c, --config <config...>', 'The path of json config file for ACL and configs')
+    .option('-n, --ngr <ngr...>', 'true or ngrok token to automatically make public your database to the world. (Ensure you protect your endpoints)')
+    .option('--flavor <flavor>', 'Database flavor to use (tingo, sqlite, mongodb)', 'tingo')
+    .option('--dblocation <dblocation>', 'Path for SQLite database file')
+    .option('--dburi <dburi>', 'MongoDB connection URI')
+    .option('--cfg <cfg>', 'Path to JSON configuration file')
+    .action(async function ({ port, config, database, ngr, flavor, dblocation, dburi, cfg }) {
+        let configOptions = {};
+        if (cfg) {
+            try {
+                const configContent = fs.readFileSync(cfg, 'utf8');
+                configOptions = JSON.parse(configContent);
+            } catch (error) {
+                console.error('Error reading config file:', error);
+                process.exit(1);
+            }
+        }
+
+        // Merge command line options with config file options, prioritizing command line
+        const options = {
+            ...configOptions,
+            port: port || configOptions.port,
+            database: database || configOptions.database,
+            ngr: ngr || configOptions.ngr,
+            flavor: flavor || configOptions.flavor,
+            dblocation: dblocation || configOptions.dblocation,
+            dburi: dburi || configOptions.dburi,
+            config: config || configOptions.config
+        };
+
+        if (!options.port || (Array.isArray(options.port) && options.port.length < 1)) {
+            options.port = 3000;
+        } else if (Array.isArray(options.port)) {
+            options.port = Number(options.port[0]);
+        } else {
+            options.port = Number(options.port);
+        }
+
+        if (!options.database || (Array.isArray(options.database) && options.database.length < 1)) {
+            options.database = 'api';
+        } else if (Array.isArray(options.database)) {
+            options.database = options.database[0];
+        }
+
+        if (Array.isArray(options.ngr) && options.ngr.length > 0) {
+            options.ngr = options.ngr[0];
+        }
+
+        if (Array.isArray(options.config) && options.config.length > 0) {
+            options.config = options.config[0];
+        }
 
 
         if (!port || port.legth < 1) {
@@ -29,21 +80,54 @@ program
             port = Number(port[0])
         }
 
-        if (!database || database.legth < 1) {
+        if (!database || database.length < 1) {
             database = 'api';
         } else {
-            database = (database[0])
+            database = database[0];
         }
 
+        // Set default values for dblocation and dburi
+        if (!options.dblocation) {
+            options.dblocation = path.join(os.homedir(), 'zeroApi', 'database.db');
+        }
+        if (!options.dburi) {
+            options.dburi = 'mongodb://localhost/zeroApi';
+        }
 
         let app = express();
+        let middleware = false;
+        let core = true;
 
-        let middleware = false
-        let core = true
+        // Ensure options.port is a number
+        options.port = Number(options.port);
 
-        let options = {
-            login: true, register: true, forgotPassword: true, autoactivate: true, database
+        const serverOptions = {
+            ...options,
+            login: true,
+            register: true,
+            forgotPassword: true,
+            autoactivate: true,
+        };
+
+        // Connect to the appropriate database
+        let db;
+        switch (options.flavor) {
+            case 'tingo':
+                db = await connectTingoDB(options.database);
+                break;
+            case 'sqlite':
+                db = await connectSQLite(options.dblocation);
+                break;
+            case 'mongodb':
+                db = await connectMongoDB(options.dburi);
+                break;
+            default:
+                console.error('Invalid database flavor');
+                process.exit(1);
         }
+
+        // Pass the database connection to the routes
+        app.set('db', db);
 
 
         app.use(morgan(function (tokens, req, res) {
@@ -53,8 +137,8 @@ program
         app.use(bodyParser.urlencoded({extended: true}));
         app.use(bodyParser.json());
 
-        app.use('/api', apiRoutes(middleware, database));
-        app.use('/', coreRoutes(core, options));
+        app.use('/api', apiRoutes(middleware, serverOptions.database));
+        app.use('/', coreRoutes(core, serverOptions));
 
         app.all('/', function (req, res) {
             try {
@@ -70,20 +154,18 @@ program
             }
 
         })
-        app.all('*', function (req, res) {
-            try {
+        app.use(function (req, res, next) {
+            res.status(404).json({
+                data: 'Visit ZeroApiBackend docs', message: 'Not found', status: 404
+            });
+        });
 
-                res.status(404).json({
-                    data: 'Visit ZeroApiBackend docs', message: 'Not found', status: 404
-                })
-            } catch (e) {
-                console.error(e)
-                res.status(500).json({
-                    error: e, message: 'Internal server error', status: 500
-                })
-            }
-
-        })
+        app.use(function (err, req, res, next) {
+            console.error(err);
+            res.status(500).json({
+                error: err, message: 'Internal server error', status: 500
+            });
+        });
 
         await app.listen(port)
         let url
@@ -119,7 +201,8 @@ program
                                                                
         `)
 
-        console.log(`Server is running on http://localhost:${port} and ${url || 'No ngrok configured'}
+        console.log(`Server options:`, JSON.stringify(serverOptions, null, 2));
+        console.log(`Server is running on http://localhost:${serverOptions.port} and ${url || 'No ngrok configured'}
           Press ctrl + c to exit cli`);
     })
 

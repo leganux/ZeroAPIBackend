@@ -1,6 +1,6 @@
-const {initializeDb} = require('./../database');
-const {v4: uuidv4} = require('uuid');
-const {getStatistics, getStatisticsString} = require("../functions/statistics");
+const { initializeDb } = require('./../database');
+const { v4: uuidv4 } = require('uuid');
+const { getStatistics, getStatisticsString } = require("../functions/statistics");
 const describe = require("../functions/describe");
 const path = require("path");
 const fsextra = require("fs-extra");
@@ -8,6 +8,50 @@ const fsextra = require("fs-extra");
 const XLSX = require('xlsx');
 const fs = require('fs');
 const moment = require("moment");
+
+// Helper function to perform database operations based on flavor
+const performDbOperation = async (flavor, operation, ...args) => {
+    switch (flavor) {
+        case 'tingo':
+            return new Promise((resolve, reject) => {
+                if (operation.name === 'find') {
+                    operation(...args).toArray((err, result) => {
+                        if (err) reject(err);
+                        else resolve(result);
+                    });
+                } else {
+                    operation(...args, (err, result) => {
+                        if (err) reject(err);
+                        else resolve(result);
+                    });
+                }
+            });
+        case 'mongodb':
+            const { collection, query } = args[0];
+            switch (operation.name) {
+                case 'find':
+                    return collection.find(query).toArray();
+                case 'insert':
+                    return collection.insertMany(args[1]);
+                case 'update':
+                    return collection.updateMany(query, { $set: args[1] });
+                case 'remove':
+                    return collection.deleteMany(query);
+                default:
+                    throw new Error(`Unsupported operation for MongoDB: ${operation.name}`);
+            }
+        case 'sqlite':
+            const { db, sql, params } = args[0];
+            return new Promise((resolve, reject) => {
+                db.all(sql, params, (err, rows) => {
+                    if (err) reject(err);
+                    else resolve(rows);
+                });
+            });
+        default:
+            throw new Error(`Unsupported database flavor: ${flavor}`);
+    }
+};
 
 
 /** This function helps  to create and return seelct fields in mongoose */
@@ -112,13 +156,13 @@ let finder = async function (table, options) {
     where = whereConstructor(where)
     like = whereConstructor(like)
 
-    const collection = await initializeDb(table, database);
+    const { collection, flavor } = await initializeDb(table, database);
 
     let find = {};
 
     if (like) {
         for (const [key, val] of Object.entries(like)) {
-            find[key] = {$regex: String(val).trim(), $options: 'i'};
+            find[key] = flavor === 'sqlite' ? `LIKE '%${String(val).trim()}%'` : {$regex: String(val).trim(), $options: 'i'};
         }
     }
     if (where) {
@@ -134,28 +178,42 @@ let finder = async function (table, options) {
 
     let projection = selectConstructor(select)
 
+    let list_of_elements;
 
-    let query = collection.find(find, projection);
+    if (flavor === 'sqlite') {
+        const whereClause = Object.entries(find).map(([key, val]) => `${key} = ?`).join(' AND ');
+        const sql = `SELECT ${Object.keys(projection).join(', ')} FROM ${table} WHERE ${whereClause}`;
+        const params = Object.values(find);
 
-    if (paginate && paginate.limit && paginate.page) {
-        paginate.limit = Number(paginate.limit);
-        paginate.page = Number(paginate.page);
-        query.limit(paginate.limit).skip(paginate.page * paginate.limit);
-    }
-    if (sort) {
-        let order = {};
-        for (const [key, val] of Object.entries(sort)) {
-            order[key] = val;
+        if (paginate && paginate.limit && paginate.page) {
+            sql += ` LIMIT ? OFFSET ?`;
+            params.push(Number(paginate.limit), Number(paginate.page) * Number(paginate.limit));
         }
-        query.sort(order);
-    }
 
-    let list_of_elements = await new Promise((resolve, reject) => {
-        query.toArray((err, docs) => {
-            if (err) return reject(err);
-            resolve(docs);
-        });
-    });
+        if (sort) {
+            const orderBy = Object.entries(sort).map(([key, val]) => `${key} ${val === 1 ? 'ASC' : 'DESC'}`).join(', ');
+            sql += ` ORDER BY ${orderBy}`;
+        }
+
+        list_of_elements = await performDbOperation(flavor, null, { db: collection, sql, params });
+    } else {
+        let query = flavor === 'tingo' ? collection.find(find, projection) : collection.find(find).project(projection);
+
+        if (paginate && paginate.limit && paginate.page) {
+            paginate.limit = Number(paginate.limit);
+            paginate.page = Number(paginate.page);
+            query = query.limit(paginate.limit).skip(paginate.page * paginate.limit);
+        }
+        if (sort) {
+            let order = {};
+            for (const [key, val] of Object.entries(sort)) {
+                order[key] = val;
+            }
+            query = query.sort(order);
+        }
+
+        list_of_elements = await performDbOperation(flavor, query.toArray.bind(query));
+    }
 
     if (populate) {
         list_of_elements = await populateConstructor(populate, populateFields, list_of_elements)
@@ -169,17 +227,21 @@ let createOneAPI = function (database) {
         try {
             const {table} = req.params
             const owner = req?.auth?._id || 'public'
-            const collection = await initializeDb(table, database);
+            const { collection, flavor } = await initializeDb(table, database);
 
             let {select, populate, populateFields} = req.query;
 
             const newItem = {...req.body, _id: uuidv4(), createdAt: new Date(), updatedAt: new Date(), owner};
-            await new Promise((resolve, reject) => {
-                collection.insert(newItem, (err, result) => {
-                    if (err) return reject(err);
-                    resolve(result);
-                });
-            });
+            
+            if (flavor === 'sqlite') {
+                const columns = Object.keys(newItem).join(', ');
+                const placeholders = Object.keys(newItem).map(() => '?').join(', ');
+                const values = Object.values(newItem);
+                const sql = `INSERT INTO ${table} (${columns}) VALUES (${placeholders})`;
+                await performDbOperation(flavor, null, { db: collection, sql, params: values });
+            } else {
+                await performDbOperation(flavor, collection.insert.bind(collection), newItem);
+            }
 
             let options = {
                 where: {_id: newItem._id},
@@ -208,40 +270,51 @@ let createManyAPI = function (database) {
         try {
             const {table} = req.params
             const owner = req?.auth?._id || 'public'
-            const collection = await initializeDb(table, database);
+            const { collection, flavor } = await initializeDb(table, database);
             let {select, sort, populate, populateFields} = req.query;
-
 
             let date = new Date()
             let body = req.body.map(item => {
                 return {...item, _id: uuidv4(), createdAt: date, updatedAt: date, owner}
             })
 
-            await new Promise((resolve, reject) => {
-                collection.insert(body, (err, result) => {
-                    if (err) return reject(err);
-                    resolve(result);
+            try {
+                if (flavor === 'sqlite') {
+                    for (const item of body) {
+                        const columns = Object.keys(item).join(', ');
+                        const placeholders = Object.keys(item).map(() => '?').join(', ');
+                        const values = Object.values(item);
+                        const sql = `INSERT INTO ${table} (${columns}) VALUES (${placeholders})`;
+                        await performDbOperation(flavor, null, { db: collection, sql, params: values });
+                    }
+                } else {
+                    await performDbOperation(flavor, collection.insert.bind(collection), body);
+                }
+
+                let ids = body.map(item => item._id);
+
+                let response = await finder(table, {
+                    where: {_id: {$in: ids}},
+                    select, sort, populate, populateFields, database, flavor
+                })
+
+                res.status(200).json({
+                    status: 200,
+                    message: 'Created Many Success',
+                    data: response
                 });
-            });
-
-
-            let ids = body.map(item => {
-                return (item._id)
-            })
-
-            let response = await finder(table, {
-                where: {_id: {$in: ids}},
-                select, sort, populate, populateFields, database
-            })
-
-            res.status(200).json({
-                status: 200,
-                message: 'Created Many Success',
-                data: response
-            });
+            } catch (dbError) {
+                console.error('Database operation error:', dbError);
+                res.status(500).json({
+                    error: dbError.message,
+                    status: 500,
+                    message: 'Database operation failed'
+                });
+            }
         } catch (err) {
+            console.error('General error:', err);
             res.status(500).json({
-                error: err,
+                error: err.message,
                 status: 500,
                 message: 'Internal server error'
             });
@@ -357,23 +430,37 @@ let getOneWhereAPI = function (database) {
 }
 
 
-let updateOneByIDAPI = function (database) {
+let updateOneByIDAPI = function (database, flavor) {
     return async function (req, res) {
         try {
             const {table, id} = req.params
             let {select, populate, populateFields} = req.query;
 
-            const collection = await initializeDb(table, database);
+            const { collection } = await initializeDb(table, { database, flavor });
             const update = {...req.body, updatedAt: new Date()};
 
-            const numReplaced = await new Promise((resolve, reject) => {
-                collection.update({_id: id}, {$set: update}, {}, (err, numReplaced) => {
-                    if (err) return reject(err);
-                    resolve(numReplaced);
+            let numReplaced;
+            let updatedDoc;
+            if (flavor === 'tingo') {
+                updatedDoc = await new Promise((resolve, reject) => {
+                    collection.findOne({_id: id}, (err, doc) => {
+                        if (err) return reject(err);
+                        if (!doc) return resolve(null);
+                        Object.assign(doc, update);
+                        collection.update({_id: id}, doc, {}, (err, numReplaced) => {
+                            if (err) return reject(err);
+                            resolve(doc);
+                        });
+                    });
                 });
-            });
+                numReplaced = updatedDoc ? 1 : 0;
+            } else {
+                const result = await performDbOperation(flavor, collection.findOneAndUpdate.bind(collection), {_id: id}, {$set: update}, {returnOriginal: false});
+                updatedDoc = result.value;
+                numReplaced = result.lastErrorObject.n;
+            }
 
-            if (numReplaced < 1) {
+            if (!updatedDoc) {
                 res.status(404).json({
                     collection: table,
                     status: 404,
@@ -382,17 +469,12 @@ let updateOneByIDAPI = function (database) {
                 });
                 return
             }
-            let options = {
-                where: {_id: id},
-                select, populate, populateFields, database
-            }
-            let response = await finder(table, options)
 
             res.status(200).json({
                 collection: table,
                 status: 200,
                 message: 'Updated Success',
-                data: response[0]
+                data: updatedDoc
             });
 
         } catch (err) {
@@ -407,34 +489,42 @@ let updateOneByIDAPI = function (database) {
 }
 
 
-let updateWhereAPI = function (database) {
+let updateWhereAPI = function (database, flavor) {
     return async function (req, res) {
         try {
             const {table} = req.params
             let {where, select, populate, populateFields} = req.query;
 
-            const collection = await initializeDb(table, database);
+            const { collection } = await initializeDb(table, { database, flavor });
             const update = {...req.body, updatedAt: new Date()};
 
             let findTochange = await finder(table, {
-                where, database
+                where, database, flavor
             })
 
-            let ids = findTochange.map(item => {
-                return item._id
-            })
+            let ids = findTochange.map(item => item._id)
             where = whereConstructor(where)
 
-            for (let item of ids) {
-                await new Promise((resolve, reject) => {
-                    collection.update({_id: item}, {$set: update}, {many: true}, (err, numReplaced) => {
-                        if (err) return reject(err);
-                        resolve(numReplaced);
+            if (flavor === 'tingo') {
+                for (let item of ids) {
+                    await new Promise((resolve, reject) => {
+                        collection.findOne({_id: item}, (err, doc) => {
+                            if (err) return reject(err);
+                            if (!doc) return resolve(null);
+                            Object.assign(doc, update);
+                            collection.update({_id: item}, doc, {}, (err, numReplaced) => {
+                                if (err) return reject(err);
+                                resolve(numReplaced);
+                            });
+                        });
                     });
-                });
+                }
+            } else {
+                await performDbOperation(flavor, collection.updateMany.bind(collection), {_id: {$in: ids}}, {$set: update});
             }
+
             let response = await finder(table, {
-                where: {_id: {$in: ids}}, select, populate, populateFields, database
+                where: {_id: {$in: ids}}, select, populate, populateFields, database, flavor
             })
             res.status(200).json({
                 collection: table,
@@ -453,33 +543,39 @@ let updateWhereAPI = function (database) {
     }
 }
 
-let updateOrCreateWhereAPI = function (database) {
+let updateOrCreateWhereAPI = function (database, flavor) {
     return async function (req, res) {
         try {
             const {table} = req.params
             const owner = req?.auth?._id || 'public'
             let {where, select, populate, populateFields} = req.query;
 
-            const collection = await initializeDb(table, database);
+            const { collection } = await initializeDb(table, { database, flavor });
             const update = {...req.body, updatedAt: new Date()};
 
             let findTochange = await finder(table, {
-                where, database
+                where, database, flavor
             })
 
             let id = ''
             if (findTochange.length > 0) {
-
                 id = findTochange[0]._id
-                await new Promise((resolve, reject) => {
-                    collection.update({_id: id}, {$set: update}, {many: true}, (err, numReplaced) => {
-                        if (err) return reject(err);
-                        resolve(numReplaced);
+                if (flavor === 'tingo') {
+                    await new Promise((resolve, reject) => {
+                        collection.findOne({_id: id}, (err, doc) => {
+                            if (err) return reject(err);
+                            if (!doc) return resolve(null);
+                            Object.assign(doc, update);
+                            collection.update({_id: id}, doc, {}, (err, numReplaced) => {
+                                if (err) return reject(err);
+                                resolve(numReplaced);
+                            });
+                        });
                     });
-                });
-
+                } else {
+                    await performDbOperation(flavor, collection.updateOne.bind(collection), {_id: id}, {$set: update});
+                }
             } else {
-
                 const newItem = {
                     ...update, ...where,
                     _id: uuidv4(),
@@ -487,23 +583,27 @@ let updateOrCreateWhereAPI = function (database) {
                     updatedAt: new Date(),
                     owner
                 };
-                await new Promise((resolve, reject) => {
-                    collection.insert(newItem, (err, result) => {
-                        if (err) return reject(err);
-                        resolve(result);
+                if (flavor === 'tingo') {
+                    await new Promise((resolve, reject) => {
+                        collection.insert(newItem, (err, result) => {
+                            if (err) return reject(err);
+                            resolve(result);
+                        });
                     });
-                });
+                } else {
+                    await performDbOperation(flavor, collection.insertOne.bind(collection), newItem);
+                }
                 id = newItem._id
             }
 
             let response = await finder(table, {
-                where: {_id: id}, select, populate, populateFields, database
+                where: {_id: id}, select, populate, populateFields, database, flavor
             })
 
             res.status(200).json({
                 collection: table,
                 status: 200,
-                message: 'Uupdated or Created Success',
+                message: 'Updated or Created Success',
                 data: response
             });
         } catch (err) {
@@ -518,19 +618,31 @@ let updateOrCreateWhereAPI = function (database) {
 }
 
 
-let deleteOneByIdAPI = function (database) {
+let deleteOneByIdAPI = function (database, flavor) {
     return async function (req, res) {
         try {
             const {table, id} = req.params
 
-            const collection = await initializeDb(table, database);
+            const { collection } = await initializeDb(table, { database, flavor });
 
-            const numRemoved = await new Promise((resolve, reject) => {
-                collection.remove({_id: id}, {}, (err, numRemoved) => {
-                    if (err) return reject(err);
-                    resolve(numRemoved);
-                });
-            });
+            let numRemoved;
+
+            if (flavor === 'tingo') {
+                const filePath = path.join(__dirname, '..', 'local', database, `${table}.json`);
+                const data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+                const index = data.findIndex(item => item._id === id);
+                
+                if (index !== -1) {
+                    data.splice(index, 1);
+                    fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+                    numRemoved = 1;
+                } else {
+                    numRemoved = 0;
+                }
+            } else {
+                numRemoved = await performDbOperation(flavor, collection.deleteOne.bind(collection), { _id: id });
+                numRemoved = numRemoved.deletedCount;
+            }
 
             if (numRemoved < 1) {
                 res.status(404).json({
@@ -862,7 +974,7 @@ let drop = function (database) {
     }
 }
 
-let xlsx = function (database) {
+let xlsx = function (database, flavor) {
     return async function (req, res) {
         try {
             const {table} = req.params
@@ -876,9 +988,10 @@ let xlsx = function (database) {
                 paginate,
                 sort,
                 populate,
-                populateFields, database
+                populateFields,
+                database,
+                flavor
             })
-
 
             const workbook = XLSX.utils.book_new();
             const worksheet = XLSX.utils.json_to_sheet(list_of_elements);
@@ -904,22 +1017,61 @@ let xlsx = function (database) {
         }
     }
 }
-let json = function (database) {
+
+let exportToJson = function (database, flavor) {
     return async function (req, res) {
         try {
-            if (!req.file) {
+            const {table} = req.params
+            let {where, whereObject, like, select, paginate, sort, populate, populateFields} = req.query;
+
+            let list_of_elements = await finder(table, {
+                where,
+                whereObject,
+                like,
+                select,
+                paginate,
+                sort,
+                populate,
+                populateFields,
+                database,
+                flavor
+            })
+
+            let name = moment().format('YYYYMMDDHHmmss') + '_' + database + '_' + table + '.json'
+            res.status(200)
+                .set({
+                    'Content-Disposition': 'attachment; filename="' + name + '"',
+                    'Content-Type': 'application/json'
+                })
+                .send(JSON.stringify(list_of_elements, null, 2));
+
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({
+                error: err,
+                status: 500,
+                message: 'Internal server error'
+            });
+        }
+    }
+}
+
+let importFromJson = function (database, flavor) {
+    return async function (req, res) {
+        try {
+            if (!req.body.file) {
                 return res.status(400).send('File not uploaded.');
             }
             const {table} = req.params
             const {avoidDuplicates} = req.query
             const owner = req?.auth?._id || 'public'
-            const collection = await initializeDb(table, database);
+            const { collection } = await initializeDb(table, database);
 
-            let jsonData = JSON.parse(req.file.buffer.toString());
+            const fileBuffer = Buffer.from(req.body.file, 'base64');
+            let jsonData = JSON.parse(fileBuffer.toString());
             if (!Array.isArray(jsonData)) {
                 jsonData = [jsonData]
             }
-
 
             if (avoidDuplicates && avoidDuplicates.id && avoidDuplicates.push) {
                 let obj = {};
@@ -929,16 +1081,16 @@ let json = function (database) {
                         obj[itemId] = {...item};
                         if (Array.isArray(avoidDuplicates.push)) {
                             avoidDuplicates.push.forEach(field => {
-                                obj[itemId][field] = [...item[field]]; // Inicializa como un array con el primer valor
+                                obj[itemId][field] = [...item[field]]; // Initialize as an array with the first value
                             });
                         } else if (typeof avoidDuplicates.push === 'string') {
                             const fieldsToPush = avoidDuplicates.push.split(',');
                             fieldsToPush.forEach(field => {
-                                obj[itemId][field] = [...item[field]]; // Inicializa como un array con el primer valor
+                                obj[itemId][field] = [...item[field]]; // Initialize as an array with the first value
                             });
                         }
                     } else {
-                        // Si ya existe el objeto, concatena los arrays correspondientes
+                        // If the object already exists, concatenate the corresponding arrays
                         if (Array.isArray(avoidDuplicates.push)) {
                             avoidDuplicates.push.forEach(field => {
                                 if (item[field]) {
@@ -956,7 +1108,7 @@ let json = function (database) {
                     }
                 });
 
-                // Convertir el objeto de nuevo a un array
+                // Convert the object back to an array
                 jsonData = Object.values(obj);
             }
 
@@ -965,13 +1117,7 @@ let json = function (database) {
                 return {...item, _id: uuidv4(), createdAt: date, updatedAt: date, owner}
             })
 
-
-            await new Promise((resolve, reject) => {
-                collection.insert(body, (err, result) => {
-                    if (err) return reject(err);
-                    resolve(result);
-                });
-            });
+            await performDbOperation(flavor, collection.insert.bind(collection), body);
 
             res.status(200).json({
                 status: 200,
@@ -990,17 +1136,17 @@ let json = function (database) {
         }
     }
 }
-let xlsx_upload = function (database) {
+let xlsx_upload = function (database, flavor) {
     return async function (req, res) {
         try {
             const {table} = req.params
-            if (!req.file) {
+            if (!req.body.file) {
                 return res.status(400).send('File not uploaded.');
             }
 
             const owner = req?.auth?._id || 'public'
-            const workbook = XLSX.read(req.file.buffer, {type: 'buffer'});
-
+            const fileBuffer = Buffer.from(req.body.file, 'base64');
+            const workbook = XLSX.read(fileBuffer, {type: 'buffer'});
 
             let tables = []
 
@@ -1008,21 +1154,24 @@ let xlsx_upload = function (database) {
                 const worksheet = workbook.Sheets[sheetName];
                 const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
-
-                const collection = await initializeDb('xls_' + table + '_' + sheetName, database);
+                const { collection } = await initializeDb('xls_' + table + '_' + sheetName, { database, flavor });
                 tables.push('xls_' + table + '_' + sheetName)
                 let date = new Date()
                 let body = jsonData.map(item => {
                     return {...item, _id: uuidv4(), createdAt: date, updatedAt: date, owner}
                 })
 
-                await new Promise((resolve, reject) => {
-                    collection.insert(body, (err, result) => {
-                        if (err) return reject(err);
-                        resolve(result);
-                    });
-                });
-
+                if (flavor === 'sqlite') {
+                    for (const item of body) {
+                        const columns = Object.keys(item).join(', ');
+                        const placeholders = Object.keys(item).map(() => '?').join(', ');
+                        const values = Object.values(item);
+                        const sql = `INSERT INTO ${table} (${columns}) VALUES (${placeholders})`;
+                        await performDbOperation(flavor, null, { db: collection, sql, params: values });
+                    }
+                } else {
+                    await performDbOperation(flavor, collection.insert.bind(collection), body);
+                }
             }
 
             res.status(200).json({
@@ -1078,8 +1227,132 @@ let transform = function (database) {
     }
 }
 
+const bigQueryAPI = function (database, flavor) {
+    return async function (req, res) {
+        try {
+            const { table } = req.params;
+            const { where, like, paginate, sort, populate } = req.body;
+
+            const { collection } = await initializeDb(table, { database, flavor });
+
+            let query = {};
+            if (where) {
+                query = { ...query, ...where };
+            }
+            if (like) {
+                for (const [key, value] of Object.entries(like)) {
+                    query[key] = { $regex: value, $options: 'i' };
+                }
+            }
+
+            let results;
+            if (flavor === 'tingo') {
+                results = await new Promise((resolve, reject) => {
+                    collection.find(query, (err, cursor) => {
+                        if (err) return reject(err);
+                        
+                        if (sort) {
+                            cursor = cursor.sort(sort);
+                        }
+
+                        if (paginate) {
+                            const { page = 0, limit = 10 } = paginate;
+                            cursor = cursor.skip(page * limit).limit(limit);
+                        }
+
+                        cursor.toArray((err, docs) => {
+                            if (err) reject(err);
+                            else resolve(docs);
+                        });
+                    });
+                });
+            } else {
+                let cursor = collection.find(query);
+
+                if (sort) {
+                    cursor = cursor.sort(sort);
+                }
+
+                if (paginate) {
+                    const { page = 0, limit = 10 } = paginate;
+                    cursor = cursor.skip(page * limit).limit(limit);
+                }
+
+                results = await performDbOperation(flavor, cursor.toArray.bind(cursor));
+            }
+
+            if (populate) {
+                results = await populateNestedFields(results, populate, database, flavor, 0);
+            }
+
+            res.status(200).json({
+                status: 200,
+                message: 'Big Query Success',
+                data: results
+            });
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({
+                error: err.message,
+                status: 500,
+                message: 'Internal server error'
+            });
+        }
+    };
+};
+
+async function populateNestedFields(results, populateOptions, database, flavor, level) {
+    if (level >= 3) return results; // Stop at 3 levels of nesting
+
+    for (const option of populateOptions) {
+        const { localField, table, foreignField, fields, populate } = option;
+        const foreignIds = results.map(item => item[localField]).filter(id => id);
+        
+        const { collection } = await initializeDb(table, { database, flavor });
+        let foreignDocs;
+
+        if (flavor === 'tingo') {
+            foreignDocs = await new Promise((resolve, reject) => {
+                collection.find({ [foreignField]: { $in: foreignIds } }, (err, cursor) => {
+                    if (err) return reject(err);
+                    cursor.toArray((err, docs) => {
+                        if (err) reject(err);
+                        else resolve(docs);
+                    });
+                });
+            });
+        } else {
+            foreignDocs = await performDbOperation(flavor, collection.find({ [foreignField]: { $in: foreignIds } }).toArray.bind(collection));
+        }
+
+        if (fields) {
+            foreignDocs = foreignDocs.map(doc => {
+                const filteredDoc = {};
+                fields.forEach(field => {
+                    if (doc.hasOwnProperty(field)) {
+                        filteredDoc[field] = doc[field];
+                    }
+                });
+                return filteredDoc;
+            });
+        }
+
+        results = results.map(item => {
+            const foreignDoc = foreignDocs.find(doc => doc[foreignField].toString() === item[localField].toString());
+            return { ...item, [localField]: foreignDoc || null };
+        });
+
+        if (populate && level < 2) {
+            foreignDocs = await populateNestedFields(foreignDocs, populate, database, flavor, level + 1);
+        }
+    }
+
+    return results;
+}
+
 module.exports = {
-    json,
+    exportToJson,
+    importFromJson,
     transform,
     xlsx,
     drop,
@@ -1093,7 +1366,9 @@ module.exports = {
     updateOneByIDAPI,
     updateWhereAPI,
     updateOrCreateWhereAPI,
-    deleteOneByIdAPI, xlsx_upload
+    deleteOneByIdAPI,
+    xlsx_upload,
+    bigQueryAPI
 };
 
 /*

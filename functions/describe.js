@@ -1,17 +1,29 @@
-const {initializeDb} = require("../database");
+const { initializeDb } = require("../database");
+
 module.exports = async function (table, database) {
-    let item = table
+    let item = table;
 
-    let collection = await initializeDb(item, database);
+    const { collection, flavor } = await initializeDb(item, database);
 
-    let list_of_elements = await new Promise((resolve, reject) => {
-
-        collection.find({}).sort({createdAt: -1}).limit(5).toArray((err, docs) => {
-            if (err) return reject(err);
-            resolve(docs);
+    let list_of_elements;
+    if (flavor === 'tingo') {
+        list_of_elements = await new Promise((resolve, reject) => {
+            collection.find({}, (err, cursor) => {
+                if (err) return reject(err);
+                cursor.sort({createdAt: -1}).limit(5).toArray((err, docs) => {
+                    if (err) return reject(err);
+                    resolve(docs);
+                });
+            });
         });
-
-    });
+    } else {
+        list_of_elements = await new Promise((resolve, reject) => {
+            collection.find({}).sort({createdAt: -1}).limit(5).toArray((err, docs) => {
+                if (err) return reject(err);
+                resolve(docs);
+            });
+        });
+    }
 
     let fields = {}
     for (let jtem of list_of_elements) {
@@ -27,6 +39,5 @@ module.exports = async function (table, database) {
         }
     }
 
-    return fields
-
+    return fields;
 }

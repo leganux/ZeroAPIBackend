@@ -1,0 +1,7 @@
+{
+  "port": 3000,
+  "database": "test_database",
+  "flavor": "mongodb",
+  "dburi": "mongodb://localhost/test_database",
+  "ngr": false
+}

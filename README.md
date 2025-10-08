@@ -40,29 +40,81 @@ npm install -g zeroapibackend
 
 ### Run
 
-To execute in default port 3000 and default database only run and then visit http://localhost:3000
+To execute in default port 3000 and default database (TingoDB) only run and then visit http://localhost:3000
 
-````bash 
+````bash
 zeroAPI run
 ````
 
-Or if you prefer define a custom port for example 5050 to execute and then visit http://localhost:5050
+You can customize the execution with various options:
 
-````bash 
+1. Define a custom port (e.g., 5050):
+
+````bash
 zeroAPI run -p 5050
 ````
 
-Or if you want to use a new custom clear datatable use -d + datatable name
+2. Use a new custom clear datatable:
 
-````bash 
-zeroAPI run -p 5050 -d erick
+````bash
+zeroAPI run -p 5050 -d myDatabase
 ````
 
-Or if you want to publish on internet your API using ngrok
+3. Publish your API on the internet using ngrok:
 
-````bash 
-zeroAPI run -p 5050 -d erick -ngr <true or ngrok token string>
+````bash
+zeroAPI run -p 5050 -d myDatabase -ngr <true or ngrok token string>
 ````
+
+4. Choose a different database flavor (TingoDB, MongoDB, or SQLite):
+
+- For TingoDB (default):
+````bash
+zeroAPI run --flavor tingo
+````
+
+- For MongoDB:
+````bash
+zeroAPI run --flavor mongodb --dburi mongodb://localhost/zeroApi
+````
+
+- For SQLite:
+````bash
+zeroAPI run --flavor sqlite --dblocation /path/to/your/database.db
+````
+
+Note: If not specified, the default MongoDB URI is `mongodb://localhost/zeroApi`, and the default SQLite database location is `{user_home_path}/zeroApi/database.db`.
+
+You can combine these options as needed. For example:
+
+````bash
+zeroAPI run -p 5050 -d myDatabase --flavor mongodb --dburi mongodb://localhost/myCustomDB -ngr true
+````
+
+5. Use a JSON configuration file:
+
+You can now use a JSON configuration file to specify all the options instead of passing them as command-line arguments. Create a JSON file (e.g., `config.json`) with the following structure:
+
+```json
+{
+  "port": 5050,
+  "database": "myDatabase",
+  "flavor": "mongodb",
+  "dburi": "mongodb://localhost/myCustomDB",
+  "ngr": true,
+  "dblocation": "/path/to/sqlite/database.db"
+}
+```
+
+Then run the server using the config file:
+
+```bash
+zeroAPI run --cfg /path/to/your/config.json
+```
+
+Note: Command-line arguments will take precedence over the configuration file if both are provided.
+
+The `--cfg` option allows you to specify a JSON configuration file that contains all the settings for your ZeroAPIBackend instance. This is particularly useful when you have multiple configurations or when you want to version control your settings.
 
 ### Commands
 
@@ -75,28 +127,57 @@ Options
 
 * -d, --dir <dir...>: Full path directory where the dump will be saved.
 * -n, --name <name...>: Database name.
+* --flavor <flavor>: Database flavor (tingo, mongodb, sqlite).
+* --dburi <dburi>: MongoDB connection URI (for MongoDB flavor).
+* --dblocation <dblocation>: SQLite database file location (for SQLite flavor).
 
 Usage Example
 
+For TingoDB:
 ```bash
-zeroAPI dump --name myDatabase --dir /path/to/save/dump
+zeroAPI dump --name myDatabase --dir /path/to/save/dump --flavor tingo
+```
+
+For MongoDB:
+```bash
+zeroAPI dump --name myDatabase --dir /path/to/save/dump --flavor mongodb --dburi mongodb://localhost/myDatabase
+```
+
+For SQLite:
+```bash
+zeroAPI dump --name myDatabase --dir /path/to/save/dump --flavor sqlite --dblocation /path/to/sqlite/database.db
 ```
 
 ### zeroAPI restore Command
 
 Description
-Restores a database from a specified ZIP file. 
+Restores a database from a specified ZIP file.
 
-**Note :This function will replace all registers in the target database.
+**Note: This function will replace all records in the target database.
 
 Options
 
 * -d, --dir <dir...>: Full path directory of the source ZIP file.
 * -n, --name <name...>: Database name.
-  Usage Example
+* --flavor <flavor>: Database flavor (tingo, mongodb, sqlite).
+* --dburi <dburi>: MongoDB connection URI (for MongoDB flavor).
+* --dblocation <dblocation>: SQLite database file location (for SQLite flavor).
 
+Usage Example
+
+For TingoDB:
 ```bash
-zeroAPI restore --name myDatabase --dir /path/to/zip/file.zip
+zeroAPI restore --name myDatabase --dir /path/to/zip/file.zip --flavor tingo
+```
+
+For MongoDB:
+```bash
+zeroAPI restore --name myDatabase --dir /path/to/zip/file.zip --flavor mongodb --dburi mongodb://localhost/myDatabase
+```
+
+For SQLite:
+```bash
+zeroAPI restore --name myDatabase --dir /path/to/zip/file.zip --flavor sqlite --dblocation /path/to/sqlite/database.db
 ```
 
 ### zeroAPI drop Command
@@ -713,3 +794,151 @@ Response example
 
    ```
 
+## Import and Export Data
+
+ZeroAPIBackend now supports importing and exporting data in JSON and Excel formats for all supported database flavors (TingoDB, MongoDB, and SQLite).
+
+### Export Data
+
+To export data from a table:
+
+1. JSON Export:
+   ```
+   GET /api/:table/json
+   ```
+
+2. Excel Export:
+   ```
+   GET /api/:table/xlsx
+   ```
+
+### Import Data
+
+To import data into a table:
+
+1. JSON Import:
+   ```
+   POST /api/:table/json
+   ```
+   Send the JSON file in the request body.
+
+2. Excel Import:
+   ```
+   POST /api/:table/xlsx
+   ```
+   Send the Excel file in the request body.
+
+Note: When importing data, make sure to set the appropriate `Content-Type` header in your request.
+
+Example using curl for JSON import:
+```bash
+curl -X POST -H "Content-Type: application/json" -d @data.json http://localhost:3000/api/users/json
+```
+
+Example using curl for Excel import:
+```bash
+curl -X POST -H "Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" --data-binary @data.xlsx http://localhost:3000/api/users/xlsx
+```
+
+These import and export features work across all supported database flavors (TingoDB, MongoDB, and SQLite). The database flavor is determined by the `--flavor` option when starting the server.
+
+### Big Query API
+
+ZeroAPIBackend now supports a powerful "Big Query" API that allows for complex queries with nested population, pagination, sorting, and filtering. This endpoint is particularly useful for more advanced data retrieval needs.
+
+To use the Big Query API:
+
+1. Send a POST request to `/api/:table/bigquery`
+2. The request body should be a JSON object with the following structure:
+
+```json
+{
+  "where": {}, // Conditions for filtering documents
+  "like": {}, // Conditions for partial matching (uses regex)
+  "paginate": { "page": 0, "limit": 10 }, // Pagination options
+  "sort": {}, // Sorting options
+  "populate": [ // Population options for related documents
+    {
+      "localField": "fieldInCurrentCollection",
+      "table": "relatedCollectionName",
+      "foreignField": "fieldInRelatedCollection",
+      "fields": ["field1", "field2"] // Fields to include from related collection
+    }
+  ]
+}
+```
+
+Example usage:
+
+```bash
+curl -X POST -H "Content-Type: application/json" -d '{
+  "where": {"name": "John Doe"},
+  "like": {"email": "example"},
+  "paginate": {"page": 0, "limit": 10},
+  "sort": {"age": -1},
+  "populate": [{"localField": "userId", "table": "users", "foreignField": "_id", "fields": ["name", "email"]}]
+}' http://localhost:3000/api/yourTableName/bigquery
+```
+
+This endpoint supports nested population up to 3 levels deep, allowing for complex data retrieval in a single query.
+
+Note: The Big Query API works across all supported database flavors (TingoDB, MongoDB, and SQLite).
+
+## Running Tests
+
+To ensure that all endpoints are working correctly across different database flavors, we've created a comprehensive test suite. Follow these steps to run the tests:
+
+1. Make sure you have all the dependencies installed:
+   ```
+   npm install
+   ```
+
+2. Choose the database flavor you want to test by using the appropriate configuration file:
+   - For TingoDB: `config_tingo.json`
+   - For MongoDB: `config_mongodb.json`
+   - For SQLite: `config_sqlite.json`
+
+3. Start the server with the chosen configuration:
+   ```
+   node cli.js run --cfg config_tingo.json
+   ```
+   Replace `config_tingo.json` with the appropriate configuration file for the database flavor you want to test.
+
+4. In a new terminal window, run the test suite:
+   ```
+   npm test
+   ```
+
+The test suite will run through all the endpoints, including the new bigquery endpoint, and verify that they're working correctly for the chosen database flavor.
+
+To test all database flavors, repeat steps 3 and 4 for each configuration file.
+
+Note: Make sure you have the necessary database systems installed and running on your machine before testing (MongoDB for the MongoDB flavor, and SQLite for the SQLite flavor).
+
+If you encounter any issues during testing, please check the error messages and ensure that your database connections are properly configured in the respective configuration files.
+
+## File Uploads
+
+For file uploads (JSON and Excel), the API now uses `multer` middleware to handle `multipart/form-data`. When testing or using the API for file uploads, make sure to send the file in the correct format:
+
+1. For JSON imports:
+   ```javascript
+   const jsonFormData = new FormData();
+   jsonFormData.append('file', new Blob([JSON.stringify(data)], { type: 'application/json' }), 'data.json');
+   
+   axios.post(`${BASE_URL}/${TABLE_NAME}/json`, jsonFormData, {
+     headers: jsonFormData.getHeaders()
+   });
+   ```
+
+2. For Excel imports:
+   ```javascript
+   const excelFormData = new FormData();
+   excelFormData.append('file', fs.createReadStream('path/to/your/excel/file.xlsx'));
+   
+   axios.post(`${BASE_URL}/${TABLE_NAME}/xlsx`, excelFormData, {
+     headers: excelFormData.getHeaders()
+   });
+   ```
+
+Make sure to adjust the content type and file name according to your specific use case.

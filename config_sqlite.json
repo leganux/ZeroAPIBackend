@@ -1,0 +1,7 @@
+{
+  "port": 3000,
+  "database": "test_database",
+  "flavor": "sqlite",
+  "dblocation": "./data/sqlite_db.sqlite",
+  "ngr": false
+}

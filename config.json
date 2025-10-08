@@ -1,0 +1,12 @@
+{
+    "flavor": "tingodb",
+    "database": "zeroApi",
+    "port": 3000,
+    "ngrok": false,
+    "ngrokAuthToken": "",
+    "db_path_sqlite": "./data/zeroapi.db",
+    "db_path_tingo": "./data/tingo",
+    "mongodb_url": "mongodb://localhost:27017"
+
+
+}
