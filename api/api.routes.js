@@ -12,7 +12,7 @@ const {
     StatisticsAPI,
     split,
     drop,
-    xlsx, xlsx_upload, transform,json
+    transform, json
 } = require('./api.controller');
 
 const router = express.Router();
@@ -24,7 +24,6 @@ const upload = multer({storage: storage});
 module.exports = function (middleware = false, database = 'api') {
     if (middleware) {
 
-        router.post('/:table/xlsx', [upload.single('file'), middleware], xlsx_upload(database));
         router.post('/:table/json', [upload.single('file'), middleware], json(database));
         router.post('/:table/transform/:to', middleware, transform(database));
 
@@ -33,7 +32,6 @@ module.exports = function (middleware = false, database = 'api') {
         router.post('/:table/', middleware, createOneAPI(database));
 
         router.get('/:table/statistics', middleware, StatisticsAPI(database));
-        router.get('/:table/xlsx', middleware, xlsx(database));
 
         router.get('/:table/', middleware, getManyAPI(database));
         router.get('/:table/one', middleware, getOneWhereAPI(database));
@@ -46,7 +44,6 @@ module.exports = function (middleware = false, database = 'api') {
         router.delete('/:table/drop', middleware, drop(database));
         router.delete('/:table/:id', middleware, deleteOneByIdAPI(database));
     } else {
-        router.post('/:table/xlsx', upload.single('file'), xlsx_upload(database));
         router.post('/:table/json', upload.single('file'), json(database));
         router.post('/:table/transform/:to', transform(database));
 
@@ -55,7 +52,6 @@ module.exports = function (middleware = false, database = 'api') {
         router.post('/:table/', createOneAPI(database));
 
         router.get('/:table/statistics', StatisticsAPI(database));
-        router.get('/:table/xlsx', xlsx(database));
 
         router.get('/:table/', getManyAPI(database));
         router.get('/:table/one', getOneWhereAPI(database));

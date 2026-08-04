@@ -1,0 +1,61 @@
+{
+    "version": "1.0",
+    "title": "Example Schema",
+    "type": "object",
+    "paths": [
+        {
+            "path": "/api/users",
+            "ops": [
+                "createOne",
+                "getAll",
+                "getOne",
+                "updateOne",
+                "deleteOne"
+            ],
+            "timestamps": true,
+            "fields": {
+                "name": {
+                    "type": "string",
+                    "required": true
+                },
+                "email": {
+                    "type": "string",
+                    "required": true,
+                    "format": "email"
+                },
+                "password": {
+                    "type": "string",
+                    "required": true,
+                    "minLength": 8
+                }
+            }
+        },
+        {
+            "path": "/api/products",
+            "ops": "*",
+            "timestamps": true,
+            "fields": {
+                "name": {
+                    "type": "string",
+                    "required": true
+                },
+                "price": {
+                    "type": "number",
+                    "required": true,
+                    "minimum": 0
+                },
+                "description": {
+                    "type": "string"
+                }
+            }
+        },
+        {
+            "path": "/api/topics",
+            "ops": [
+                "-deleteOne"
+            ],
+            "timestamps": true,
+            "fields": "**" //any field is allowed
+        }
+    ]
+}

@@ -1,13 +1,11 @@
 const {initializeDb} = require('./../database');
-const {v4: uuidv4} = require('uuid');
+const {randomUUID: uuidv4} = require('crypto');
 const {getStatistics, getStatisticsString} = require("../functions/statistics");
 const describe = require("../functions/describe");
 const path = require("path");
 const fsextra = require("fs-extra");
 
-const XLSX = require('xlsx');
 const fs = require('fs');
-const moment = require("moment");
 
 
 /** This function helps  to create and return seelct fields in mongoose */
@@ -32,21 +30,29 @@ let selectConstructor = function (select) {
 
 }
 let whereConstructor = function (where) {
-
     if (where) {
-        for (const [key, val] of Object.entries(where)) {
+        for (const key of Object.keys(where)) {
+            // strip top-level MongoDB operator keys to prevent NoSQL injection
+            if (key.startsWith('$')) {
+                delete where[key];
+                continue;
+            }
+            const val = where[key];
+            // do not recurse — preserves internal operator values like {$in: [...]}
+            if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
+                continue;
+            }
             if (Number(val)) {
-                where[key] = Number(val)
-                continue
+                where[key] = Number(val);
+                continue;
             }
             if (typeof val == 'boolean' || val == 'true' || val == 'false') {
-                where[key] = Boolean(val)
-                continue
+                where[key] = Boolean(val);
+                continue;
             }
         }
     }
-
-    return where
+    return where;
 }
 let populateConstructor = async function (populate, populateFields, list_of_elements) {
     if (populate.localFields && populate.tables && populate.foreignFields) {
@@ -862,48 +868,7 @@ let drop = function (database) {
     }
 }
 
-let xlsx = function (database) {
-    return async function (req, res) {
-        try {
-            const {table} = req.params
-            let {where, whereObject, like, select, paginate, sort, populate, populateFields} = req.query;
 
-            let list_of_elements = await finder(table, {
-                where,
-                whereObject,
-                like,
-                select,
-                paginate,
-                sort,
-                populate,
-                populateFields, database
-            })
-
-
-            const workbook = XLSX.utils.book_new();
-            const worksheet = XLSX.utils.json_to_sheet(list_of_elements);
-
-            XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
-            const excelBuffer = XLSX.write(workbook, {bookType: 'xlsx', type: 'buffer'});
-
-            let name = moment().format('YYYYMMDDHHmmss') + '_' + database + '_' + table + '.xlsx'
-            res.status(200)
-                .set({
-                    'Content-Disposition': 'attachment; filename="' + name + '"',
-                    'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-                })
-                .send(excelBuffer);
-
-        } catch (err) {
-            console.error(err);
-            res.status(500).json({
-                error: err,
-                status: 500,
-                message: 'Internal server error'
-            });
-        }
-    }
-}
 let json = function (database) {
     return async function (req, res) {
         try {
@@ -990,58 +955,7 @@ let json = function (database) {
         }
     }
 }
-let xlsx_upload = function (database) {
-    return async function (req, res) {
-        try {
-            const {table} = req.params
-            if (!req.file) {
-                return res.status(400).send('File not uploaded.');
-            }
 
-            const owner = req?.auth?._id || 'public'
-            const workbook = XLSX.read(req.file.buffer, {type: 'buffer'});
-
-
-            let tables = []
-
-            for (let sheetName of workbook.SheetNames) {
-                const worksheet = workbook.Sheets[sheetName];
-                const jsonData = XLSX.utils.sheet_to_json(worksheet);
-
-
-                const collection = await initializeDb('xls_' + table + '_' + sheetName, database);
-                tables.push('xls_' + table + '_' + sheetName)
-                let date = new Date()
-                let body = jsonData.map(item => {
-                    return {...item, _id: uuidv4(), createdAt: date, updatedAt: date, owner}
-                })
-
-                await new Promise((resolve, reject) => {
-                    collection.insert(body, (err, result) => {
-                        if (err) return reject(err);
-                        resolve(result);
-                    });
-                });
-
-            }
-
-            res.status(200).json({
-                collection: table,
-                status: 200,
-                message: 'Excel Imported correctly',
-                data: {tables}
-            });
-
-        } catch (e) {
-            console.error(e);
-            res.status(500).json({
-                error: e,
-                status: 500,
-                message: 'Internal server error'
-            });
-        }
-    }
-}
 
 let transform = function (database) {
     return async function (req, res) {
@@ -1081,7 +995,6 @@ let transform = function (database) {
 module.exports = {
     json,
     transform,
-    xlsx,
     drop,
     split,
     createOneAPI,
@@ -1093,7 +1006,7 @@ module.exports = {
     updateOneByIDAPI,
     updateWhereAPI,
     updateOrCreateWhereAPI,
-    deleteOneByIdAPI, xlsx_upload
+    deleteOneByIdAPI
 };
 
 /*
