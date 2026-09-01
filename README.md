@@ -1,107 +1,161 @@
-# ZeroAPIBackend
+<div align="center">
 
-The world's first API-ready database with a REST interface
+# ⚡ ZeroAPIBackend
 
-ZeroAPIBackend is a CLI tool that allows you to instantly create a Database - REST API by simply running the "zeroAPI
-run" command.
+### *The instant backend for humans and AI agents.*
 
-This database tool requires no database setup because it is also a database, and you don't need to define tables or
-perform complex configurations. Everything is generated on the fly when you consume an endpoint, offering a hassle-free
-solution for rapid API development for developers and data experts.
+[![npm version](https://img.shields.io/npm/v/zeroapibackend?color=blueviolet&style=for-the-badge&logo=npm)](https://www.npmjs.com/package/zeroapibackend)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](./LICENSE)
+[![Node.js](https://img.shields.io/badge/Node.js-20%2B-green?style=for-the-badge&logo=node.js)](https://nodejs.org)
+[![Made by Leganux](https://img.shields.io/badge/Made%20by-Leganux-ff69b4?style=for-the-badge)](https://leganux.com)
+
+> **A full REST API + database, running in under 60 seconds.**
+> **Zero configuration. Zero boilerplate. Zero excuses.**
+
+[🚀 Quick Start](#️-1-minute-quick-start) · [📖 Docs](#️-how-to-use) · [🌐 Español](./README.es.md) · [🤝 Contributing](#-contributing)
+
+</div>
 
 ---
 
-> **ZeroAPIBackend** is an open-source project by **[Leganux](https://leganux.com)** — visit us at **[leganux.com](https://leganux.com)**
+## 🧠 Why "for humans AND AI agents"?
+
+Most backend tools were designed for one type of user: the developer who reads docs, writes code, and configures things manually. But the world has changed.
+
+Today there are **two kinds of builders**:
+
+| 👤 Humans | 🤖 AI Agents |
+|-----------|-------------|
+| Frontend devs who need a quick backend | LLMs & autonomous agents that call REST APIs to store and retrieve data |
+| Data analysts who want to query a dataset | AI pipelines that need a persistent, schema-free datastore |
+| Hackathon teams who need a backend *right now* | Code-generation tools that scaffold projects and need a live API endpoint |
+| Educators teaching REST concepts | Autonomous workflows (LangChain, CrewAI, AutoGPT…) that need memory/state |
+
+**ZeroAPIBackend speaks fluently to both.** A human runs one command. An AI agent fires HTTP requests. The backend just works — no schemas to define, no migrations to run, no config files to write.
+
+> 💡 The name is a statement: this backend does not care *who* is calling it. Whether it's a curious developer or a GPT-4 function-call loop, ZeroAPI responds instantly.
 
 ---
 
-## Use Cases
+## ⏱️ 1-Minute Quick Start
+
+> From zero to a live REST API with a real database in **under 60 seconds**. Seriously.
+
+```bash
+# Step 1 — Install (only once)
+npm install -g zeroapibackend
+
+# Step 2 — Launch 🚀
+zeroAPI run
+```
+
+✅ Your API is live at **http://localhost:3000**
+
+```bash
+# Try it immediately — no tables to create, no schema to define:
+curl -X POST http://localhost:3000/api/users/ \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Alice", "email": "alice@example.com", "age": 30}'
+
+# Read it back:
+curl http://localhost:3000/api/users/
+```
+
+> 🎉 **A full CRUD REST API with persistent storage is now running.**
+> No database server. No ORM setup. No config files. Just one command.
+
+---
+
+## 🗂️ Table of Contents
+
+- [Why humans and AI agents?](#-why-humans-and-ai-agents)
+- [1-Minute Quick Start](#️-1-minute-quick-start)
+- [Features](#-features)
+- [Use Cases](#-use-cases)
+- [Database Flavors](#️-database-flavors)
+- [Rate Limiting](#️-rate-limiting)
+- [Integration with Gateways & Proxies](#-integration-with-api-gateways--reverse-proxies)
+- [Schema Validation](#-schema-validation)
+- [How to Use](#️-how-to-use)
+- [Endpoints](#-endpoints)
+- [Query Parameters](#-query-parameters)
+- [How Populates Work](#-how-populates-work)
+- [Full Examples](#-full-examples)
+- [Statistics Endpoint](#-statistics-endpoint)
+- [Contributing](#-contributing)
+
+---
+
+## ✨ Features
+
+- ⚡ **Instant REST API** — launch a fully functional API with a single command
+- 🗄️ **No database setup** — the database is embedded; tables are created on-the-fly
+- 🔄 **Dynamic table handling** — CRUD on any table, any time, no predefined schemas
+- 🤖 **AI-agent ready** — schema-free endpoints any LLM or autonomous agent can consume via HTTP
+- 📊 **Statistics endpoints** — mean, median, mode, std, variance, quartiles built-in
+- 🔐 **Advanced security** — ACL config + JWT Bearer token authentication
+- 🌍 **Public sharing** — expose your local API to the internet via ngrok integration
+- 🧩 **Multi-database support** — TingoDB (embedded), SQLite, and MongoDB
+- 🛡️ **Rate limiting** — built-in per-IP throttling (default 3 req/s, configurable)
+- 🧹 **Data cleaning** — import JSON/CSV datasets and clean them via REST
+- 📐 **Schema validation** — optional JSON-based request validation layer
+
+---
+
+## 🎯 Use Cases
 
 | Who | How |
 |-----|-----|
-| **Frontend developers** | Spin up a real REST API in seconds without writing any backend code. Ideal for prototyping and demos. |
-| **Data analysts** | Import a JSON/CSV dataset, query it via REST, and get statistics (mean, median, std, quartiles) out of the box. |
-| **Hackathon teams** | Full persistent backend in one command — no cloud setup, no config files. |
-| **QA / testing** | Reproducible API fixtures using TingoDB or SQLite; reset data with a single `DELETE /api/:table/drop`. |
-| **Internal tools** | Lightweight backend for dashboards, admin panels, and scripts that need a quick datastore. |
-| **CI/CD pipelines** | SQLite flavor gives you a zero-dependency file-based backend that works anywhere Node.js runs. |
-| **Education** | Teach REST API concepts without boilerplate — students can hit real endpoints immediately. |
+| 👨‍💻 **Frontend developers** | Spin up a real REST API in seconds without writing any backend code. Ideal for prototyping and demos. |
+| 📊 **Data analysts** | Import a JSON/CSV dataset, query it via REST, and get statistics (mean, median, std, quartiles) out of the box. |
+| 🏆 **Hackathon teams** | Full persistent backend in one command — no cloud setup, no config files. |
+| 🧪 **QA / Testing** | Reproducible API fixtures using TingoDB or SQLite; reset data with a single `DELETE /api/:table/drop`. |
+| 🛠️ **Internal tools** | Lightweight backend for dashboards, admin panels, and scripts that need a quick datastore. |
+| 🔁 **CI/CD pipelines** | SQLite flavor gives you a zero-dependency file-based backend that works anywhere Node.js runs. |
+| 🎓 **Education** | Teach REST API concepts without boilerplate — students can hit real endpoints immediately. |
+| 🤖 **AI Agents** | LLMs, LangChain agents, AutoGPT, CrewAI — any agent that can make HTTP calls gets instant persistent memory. |
 
 ---
 
-## Features
+## 🗄️ Database Flavors
 
-* Automatic API Creation: Launch a fully functional REST API with a single command.
-* No Database Setup Required: Avoid the complexities of setting up and managing a database.
-* Dynamic Table Handling: Create, read, update, and delete records in any table without predefined schemas.
-* Designed for Data Analysts: Obtain the data dictionary easily via an endpoint, and by running the CLI with the -d
-  parameter, you can automatically generate a completely clean new database.
-* Data Cleaning and Statistics Endpoints: Automatically obtain statistics like mean, median, mode, standard deviation,
-  quartiles, etc.
-* Frontend-Based Queries: Perform all queries directly from the frontend, without needing to write backend code or
-  install any database engine.
-* Advanced Security: Protect your queries with an ACL configuration JSON and JWT Bearer token-based authentication.
-* Automatic public share endpoints across (ngrok plugin)
-* **Multi-database support**: TingoDB (default, embedded), SQLite and MongoDB — selectable at startup with no code changes.
-
-## Get started
-
-#### Prerequisites
-
-* Install node js 20+ and npm
-
-### Install
-
-````bash 
-npm install -g zeroapibackend
-````
-
----
-
-## Database Flavors
-
-ZeroAPIBackend supports three database backends that can be selected when the server starts. All of them expose the
-same REST API — no code changes are needed.
+ZeroAPIBackend supports three database backends. All expose the **same REST API** — no code changes needed when switching.
 
 | Flavor | When to use | How to identify |
 |--------|-------------|-----------------|
-| **TingoDB** (default) | Local development, zero config | Any plain name, e.g. `api`, `myproject` |
-| **SQLite** | File-based persistence, CI/CD, edge | Path ending in `.sqlite` or `.db`, or prefixed with `sqlite:` |
-| **MongoDB** | Production, cloud, replica sets | Connection string starting with `mongodb://` or `mongodb+srv://` |
+| 🟢 **TingoDB** (default) | Local development, zero config | Any plain name, e.g. `api`, `myproject` |
+| 🔵 **SQLite** | File-based persistence, CI/CD, edge | Path ending in `.sqlite` or `.db`, or prefixed with `sqlite:` |
+| 🟠 **MongoDB** | Production, cloud, replica sets | Connection string starting with `mongodb://` or `mongodb+srv://` |
 
 ### Selecting the flavor at startup
 
 **Priority order:** CLI argument `--database` → environment variable `DATABASE` → default (`api` = TingoDB)
 
 ```bash
-# TingoDB — default embedded DB (folder: ./local/api)
-node app.js
+# TingoDB — default embedded DB
+zeroAPI run
 
 # TingoDB — custom folder name
-node app.js --database my_project
+zeroAPI run --database my_project
 
-# SQLite — file path
-node app.js --database /data/app.sqlite
-node app.js --database ./local/app.db
-node app.js --database sqlite:/data/app.sqlite
+# SQLite
+zeroAPI run --database /data/app.sqlite
+zeroAPI run --database sqlite:/data/app.sqlite
 
-# MongoDB — connection string
-node app.js --database mongodb://localhost:27017/mydb
-node app.js --database mongodb+srv://user:pass@cluster.mongodb.net/mydb
+# MongoDB
+zeroAPI run --database mongodb://localhost:27017/mydb
+zeroAPI run --database mongodb+srv://user:pass@cluster.mongodb.net/mydb
 
-# Custom port  (CLI arg or PORT env var)
-node app.js --database /data/app.sqlite --port 4000
-PORT=4000 DATABASE=/data/app.sqlite node app.js
+# Custom port
+zeroAPI run --database /data/app.sqlite --port 4000
+PORT=4000 DATABASE=/data/app.sqlite zeroAPI run
 
-# Rate limiting — default 3 req/s per IP, configurable
-node app.js --rate-limit 10
-RATE_LIMIT=10 node app.js
-
-# With nodemon (dev)
-npm run dev -- --database /data/app.sqlite
+# Rate limiting
+zeroAPI run --rate-limit 10
+RATE_LIMIT=10 zeroAPI run
 ```
 
-The startup banner shows the active flavor and connection string:
+The startup banner shows the active flavor:
 
 ```
 ┌─────────────────────────────────────────────┐
@@ -125,21 +179,16 @@ The startup banner shows the active flavor and connection string:
 
 ---
 
-## Rate Limiting
+## 🛡️ Rate Limiting
 
 A built-in rate limiter protects every endpoint. The default is **3 requests per second per IP**.
 
 **Priority order:** CLI argument `--rate-limit` → environment variable `RATE_LIMIT` → default (`3`)
 
 ```bash
-# Default (3 req/s)
-node app.js
-
-# Increase limit for internal/trusted environments
-node app.js --rate-limit 60
-
-# Via environment variable
-RATE_LIMIT=60 node app.js
+zeroAPI run                    # Default (3 req/s)
+zeroAPI run --rate-limit 60    # Custom limit
+RATE_LIMIT=60 zeroAPI run      # Via env var
 ```
 
 Requests that exceed the limit receive a `429 Too Many Requests` response:
@@ -150,15 +199,11 @@ Requests that exceed the limit receive a `429 Too Many Requests` response:
 
 ---
 
-## Integration with API Gateways & Reverse Proxies
+## 🌐 Integration with API Gateways & Reverse Proxies
 
-ZeroAPIBackend is designed to run as a **standalone microservice**. In production you will typically place it behind a gateway or reverse proxy that handles TLS, authentication aggregation, and routing. Below are the most common patterns.
+ZeroAPIBackend is designed to run as a **standalone microservice**. In production, place it behind a gateway or reverse proxy for TLS and authentication.
 
----
-
-### nginx (reverse proxy)
-
-The simplest production setup: nginx terminates HTTPS and forwards traffic to ZeroAPIBackend on a private port.
+### nginx
 
 ```nginx
 # /etc/nginx/sites-available/zeroapi
@@ -327,7 +372,7 @@ Internet
 
 ---
 
-## Schema Middleware (Validation)
+## 📐 Schema Validation
 
 ZeroAPIBackend includes an optional **schema validation middleware** that controls which resources, operations and fields are accessible via the REST API.  
 It is activated by passing a JSON schema file at startup — without it the API remains fully open (original behaviour).
@@ -350,16 +395,13 @@ If all checks pass, the request continues to the normal route handler.
 
 ```bash
 # CLI argument
-node app.js --schema ./example.schema.json
+zeroAPI run --schema ./example.schema.json
 
 # Environment variable
-SCHEMA=./example.schema.json node app.js
+SCHEMA=./example.schema.json zeroAPI run
 
 # Combined with other options
-node app.js --database /data/app.sqlite --port 4000 --schema ./schemas/api.schema.json
-
-# With nodemon (dev)
-npm run dev -- --schema ./example.schema.json
+zeroAPI run --database /data/app.sqlite --port 4000 --schema ./schemas/api.schema.json
 ```
 
 When the schema is loaded, the startup banner shows the active file:
@@ -495,302 +537,158 @@ See [`example.schema.json`](./example.schema.json) for a ready-to-use reference 
 
 ---
 
-## How to use
+## 🛠️ How to Use
+
+### Prerequisites
+
+- Node.js 20+
+
+### Install
+
+```bash
+npm install -g zeroapibackend
+```
 
 ### Run
 
-To execute in default port 3000 and default database only run and then visit http://localhost:3000
-
-````bash 
+```bash
+# Default port 3000
 zeroAPI run
-````
 
-Or if you prefer define a custom port for example 5050 to execute and then visit http://localhost:5050
-
-````bash 
+# Custom port
 zeroAPI run -p 5050
-````
 
-Or if you want to use a new custom clear datatable use -d + datatable name
+# Custom port + custom database
+zeroAPI run -p 5050 -d myproject
 
-````bash 
-zeroAPI run -p 5050 -d erick
-````
+# Expose to the internet via ngrok
+zeroAPI run -p 5050 -d myproject -ngr true
+zeroAPI run -p 5050 -d myproject -ngr <your-ngrok-token>
+```
 
-Or if you want to publish on internet your API using ngrok
+### CLI Commands
 
-````bash 
-zeroAPI run -p 5050 -d erick -ngr <true or ngrok token string>
-````
-
-### Commands
-
-### zeroAPI dump Command
-
-Description
-Dumps a specified database by name.
-
-Options
-
-* -d, --dir <dir...>: Full path directory where the dump will be saved.
-* -n, --name <name...>: Database name.
-
-Usage Example
+#### `zeroAPI dump` — backup a database
 
 ```bash
 zeroAPI dump --name myDatabase --dir /path/to/save/dump
 ```
 
-### zeroAPI restore Command
+| Option | Description |
+|--------|-------------|
+| `-n, --name` | Database name |
+| `-d, --dir` | Directory where the dump will be saved |
 
-Description
-Restores a database from a specified ZIP file. 
+#### `zeroAPI restore` — restore a database
 
-**Note :This function will replace all registers in the target database.
-
-Options
-
-* -d, --dir <dir...>: Full path directory of the source ZIP file.
-* -n, --name <name...>: Database name.
-  Usage Example
+> ⚠️ This will replace all existing records in the target database.
 
 ```bash
-zeroAPI restore --name myDatabase --dir /path/to/zip/file.zip
+zeroAPI restore --name myDatabase --dir /path/to/file.zip
 ```
 
-### zeroAPI drop Command
-
-Description
-Drops a specified database by name.
-
-Options
-
-* -n, --name <name...>: Database name.
-
-Usage Example
+#### `zeroAPI drop` — delete a database
 
 ```bash
 zeroAPI drop --name myDatabase
 ```
 
-### Endpoints
+---
 
-- Create Multiple Records:
-    - POST /api/:table/many
-        - Description: Create multiple records in the specified table.
+## 🔌 Endpoints
 
+| Method | Route | Description |
+|--------|-------|-------------|
+| `POST` | `/api/:table/many` | Create multiple records |
+| `POST` | `/api/:table/` | Create a single record |
+| `GET` | `/api/:table/` | Get multiple records |
+| `GET` | `/api/:table/one` | Get a single record by condition |
+| `GET` | `/api/:table/:id` | Get a single record by ID |
+| `PUT` | `/api/:table/findOrCreate` | Update or create a record |
+| `PUT` | `/api/:table/:id` | Update a record by ID |
+| `PUT` | `/api/:table/` | Update records by condition |
+| `DELETE` | `/api/:table/:id` | Delete a record by ID |
+| `DELETE` | `/api/:table/drop` | Drop / clear entire table |
+| `GET` | `/api/:table/statistics` | Field statistics |
+| `GET` | `/database/describe` | Describe all collections/tables |
 
-- Create a Single Record:
-    - POST /api/:table/
-        - Description: Create a single record in the specified table.
+---
 
+## 🔍 Query Parameters
 
-- Get Multiple Records:
-    - GET /api/:table/
-        - Description: Retrieve multiple records from the specified table.
+### 1. `select` — Field Selection
 
-
-- Get a Single Record Based on Conditions:
-    - GET /api/:table/one
-        - Description: Retrieve a single record from the specified table that meets the specified conditions.
-
-
-- Get a Single Record by ID:
-    - GET /api/:table/:id
-        - Description: Retrieve a single record by its ID from the specified table.
-
-
-- Update or Create a Record:
-    - PUT /api/:table/findOrCreate
-        - Description: Update an existing record or create a new one in the specified table.
-
-
-- Update a Record by ID:
-    - PUT /api/:table/:id
-        - Description: Update a record by its ID in the specified table.
-
-
-- Update Records Based on Conditions:
-    - PUT /api/:table/
-        - Description: Update records in the specified table that meet the specified conditions.
-
-
-- Delete a Record by ID:
-    - DELETE /api/:table/:id
-        - Description: Delete a record by its ID from the specified table.
-
-- Get statistics like mean, mode, avg, etc of a field:
-    - GET /api/:table/statistics?select=< fields comma separed >
-        - Description: gets statisctics from a column in query
-
-### Query parameters
-
-To use query parameters in the API routes, you can specify various parameters in the URL that will modify the behavior
-of the CRUD operations. Below are some examples of how to use these parameters:
-
-1. select: Field Selection
-   The select parameter is used to specify the fields you want to include in the response.
-
-   Example: Retrieve only the name and email fields from the records in the users table:
-
-```bash 
-curl -X GET "http://localhost:3000/api/users/?select=name,email"
+```bash
+curl "http://localhost:3000/api/users/?select=name,email"
 ```
 
-2. where: Specific Conditions
-   The where parameter is used to filter records based on certain conditions.
+### 2. `where` — Filtering
 
-   Example: Retrieve all records from the users table where age is equal to 30:
-
-```bash 
-curl -X GET "http://localhost:3000/api/users/?where[age]=30"
+```bash
+curl "http://localhost:3000/api/users/?where[age]=30"
 ```
 
-3. paginate: Pagination
-   The paginate parameter is used to paginate the results, specifying the number of records per page and the page
-   number.
+### 3. `paginate` — Pagination
 
-   Example: Retrieve the second page of records from the users table, with 10 records per page:
-
-```bash 
-curl -X GET "http://localhost:3000/api/users/?paginate[limit]=10&paginate[page]=1"
+```bash
+curl "http://localhost:3000/api/users/?paginate[limit]=10&paginate[page]=1"
 ```
 
-4. sort: Sorting
-   The sort parameter is used to sort the results based on one or more fields.
+### 4. `sort` — Sorting
 
-   Example: Retrieve all records from the users table sorted by createdAt in descending order:
-
-```bash 
-curl -X GET "http://localhost:3000/api/users/?sort[createdAt]=-1"
+```bash
+curl "http://localhost:3000/api/users/?sort[createdAt]=-1"
 ```
 
-5. populate: Relationships
-   The populate parameter is used to include related documents from other collections.
+### 5. `populate` — Join related documents
 
-   Example: Retrieve all records from the orders table and include the details of the related users:
-
-```bash 
-curl -X GET "http://localhost:3000/api/orders/?populate[localFields]=userId&populate[tables]=users&populate[foreignFields]=_id"
-
+```bash
+curl "http://localhost:3000/api/orders/?populate[localFields]=userId&populate[tables]=users&populate[foreignFields]=_id"
 ```
 
-### Combined Examples
+### Combined example
 
-You can combine several query parameters to perform more complex queries.
-
-Example: Retrieve the first page of records from the users table, with 5 records per page, only the name and email
-fields, sorted by createdAt in ascending order, and where age is equal to 25:
-
-```bash 
-curl -X GET "http://localhost:3000/api/users/?select=name,email&paginate[limit]=5&paginate[page]=0&sort[createdAt]=1&where[age]=25"
+```bash
+curl "http://localhost:3000/api/users/?select=name,email&paginate[limit]=5&paginate[page]=0&sort[createdAt]=1&where[age]=25"
 ```
 
-### Usage in Create Operations
+### Using `select` on create
 
-You can use select, populate, and other parameters in create operations to specify which fields to include in the
-response and how to relate the new documents.
-
-Example: Create a new record in the users table and return only the name and email fields:
-
-```bash 
-curl -X POST "http://localhost:3000/api/users/?select=name,email" -H "Content-Type: application/json" -d '{
-    "name": "Jane Doe",
-    "email": "jane.doe@example.com",
-    "age": 28
-}'
-
+```bash
+curl -X POST "http://localhost:3000/api/users/?select=name,email" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Jane Doe", "email": "jane.doe@example.com", "age": 28}'
 ```
 
-## Detailed Explanation of How Populates Work in the Library
+---
 
-The populateConstructor function is used to fetch related data from other tables and incorporate it into the main query
-result. This mimics the behavior of SQL joins in a NoSQL database by manually linking documents based on specified
-fields.
+## 🔗 How Populates Work
 
-## How populateConstructor Works
+The `populateConstructor` function fetches related data from other tables and incorporates it into the main query result — mimicking SQL JOINs in a schema-free environment.
 
-1. Parameter Parsing:
+### How it works
 
-The populate object contains localFields, tables, and foreignFields, which are comma-separated strings specifying the
-fields and tables involved in the population.
-These strings are split into arrays for further processing.
+1. **Parameter Parsing** — `populate` object contains `localFields`, `tables`, and `foreignFields` (comma-separated).
+2. **Iteration** — for each result record, iterates over specified fields and tables.
+3. **Filter Construction** — builds `$eq` or `$in` filters depending on whether the field value is a string or array.
+4. **Field Selection** — `populateFields` limits which fields are returned from the foreign table.
+5. **Database Query** — executes the lookup and replaces the local field value with the related document(s).
 
-2. Iteration Over Records:
+### Example: orders → users
 
-For each item in the list_of_elements (the main query result), the function iterates over the specified fields and
-tables.
-For each field-table combination, a filter is constructed to match the related documents in the foreign table.
+```bash
+# Basic populate
+curl "http://localhost:3000/api/orders/?populate[localFields]=userId&populate[tables]=users&populate[foreignFields]=_id"
 
-3. Filter Construction:
-
-If the value of the localField in the current item is a string, a simple equality filter is created.
-If the value is an array, an $in filter is created to match any of the values in the array.
-
-4. Field Selection:
-
-If populateFields are specified, only the indicated fields are selected from the foreign table.
-
-5. Database Query:
-
-The function initializes the connection to the foreign table and executes the query with the constructed filter and
-field selection.
-The results are stored back into the original item, replacing the localField value with the related documents.
-
-6. Final Assembly:
-
-The populated items are collected into a new array and returned.
-Example of Using Populates in CLI
-To use the populate parameter in your CLI to fetch related data from other tables, follow this example:
-
-## Scenario
-
-You have two collections: orders and users. Each order document has a userId field referencing a user. You want to
-retrieve orders and include user details in the result.
-
-```bash 
-curl -X GET "http://localhost:3000/api/orders/?populate[localFields]=userId&populate[tables]=users&populate[foreignFields]=_id"
+# With field selection (only name and email from users)
+curl "http://localhost:3000/api/orders/?populate[localFields]=userId&populate[tables]=users&populate[foreignFields]=_id&populateFields[users]=name,email"
 ```
 
-### How the Example Works
+---
 
-1. Query URL:
+## 💻 Full Examples
 
-* The URL specifies the orders table and includes the populate parameter with localFields, tables, and foreignFields.
-* localFields=userId: Indicates the field in the orders collection that references the users collection.
-* tables=users: Specifies the foreign table (users) to fetch data from.
-* foreignFields=_id: Specifies the field in the users collection that matches the userId field in the orders collection.
-
-2. Result:
-
-* The server will process the request, fetch orders, and for each order, it will look up the corresponding user in the
-  users collection.
-* The userId in each order will be replaced with the full user document.
-
-## Extended Example with Field Selection
-
-You can also specify which fields to include from the related documents using populateFields.
-
-Example Command
-
-```bash 
-curl -X GET "http://localhost:3000/api/orders/?populate[localFields]=userId&populate[tables]=users&populate[foreignFields]=_id&populateFields[users]=name,email"
-```
-
-### How the Extended Example Works
-
-1. Query URL:
-
-* The URL includes an additional populateFields parameter specifying which fields to include from the users collection.
-  populateFields[users]=name,email: Indicates that only the name and email fields from the users collection should be
-  included in the response.
-
-2. Result:
-
-* The server will fetch orders and populate the userId field with user documents that include only the name and email
-  fields.
-
-## Full example  for python
+### Python
 
 ```python
 import requests
@@ -880,7 +778,7 @@ if __name__ == "__main__":
 
 ```
 
-## Full example  for javascript
+### JavaScript (axios)
 
 ```javascript
  const axios = require('axios');
@@ -1014,11 +912,15 @@ async function deleteUserById(userId) {
 
  ```
 
-## If you want to get information from database
+---
 
-Visit GET : http://localhost:3000/database/describe
+## 📊 Statistics Endpoint
 
-## Example of statistics endpoint
+Get statistical analysis for numeric and categorical fields.
+
+> Describe your database: `GET http://localhost:3000/database/describe`
+
+### Statistics example
 
  ```javascript
 const options = {method: 'GET', headers: {'User-Agent': 'insomnia/2023.5.8'}};
@@ -1174,16 +1076,30 @@ Response example
 
 ---
 
-## About
+## 🤝 Contributing
 
-ZeroAPIBackend is an open-source project built and maintained by **[Leganux](https://leganux.com)**.
+Pull requests are welcome! For major changes, please open an issue first.
 
-We build tools that make developers' lives simpler. If you find ZeroAPIBackend useful, check out our other projects and resources at **[leganux.com](https://leganux.com)**.
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-### Contributing
+---
 
-Pull requests are welcome. For major changes please open an issue first to discuss what you would like to change.
+## 📄 License
 
-### License
+[MIT](./LICENSE) © [Leganux](https://leganux.com)
 
-[MIT](./LICENSE) © Leganux
+---
+
+<div align="center">
+
+**ZeroAPIBackend** is an open-source project built and maintained by **[Leganux](https://leganux.com)**
+
+We build tools that make developers' (and agents') lives simpler. ⚡
+
+[![leganux.com](https://img.shields.io/badge/🌐%20Visit-leganux.com-blueviolet?style=for-the-badge)](https://leganux.com)
+
+</div>
